@@ -5,15 +5,25 @@
             body {
                 margin: 0;
             }
-            canvas {
-                width: 100%;
-                height: 100%;
-            }
         </style>
     </head>
     <body>
         <script src="http://threejs.org/build/three.min.js"></script>
         <script>
+            var hToW = 1; // the ratio of height to width, which may change throughout the program
+            var height; // should not be changed manually. Set by updateScreenSize.
+            var width; // should not be changed manually. Set by updateScreenSize.
+            function updateScreenSize() {
+                width = window.innerWidth - 15; // 15 is the width of the scrollbar, measured experimentally
+                canvas.style.width = width;
+                height = hToW * width;
+                canvas.style.height = height
+                camera = new THREE.OrthographicCamera(-100, 100, 100, 100 - 200 * hToW, 0.1, 1000)
+                renderer.setSize(width, height);
+            }
+            
+            window.onresize = updateScreenSize;
+        
             function ColorBox(width, height, depth) {
                 var geom = new THREE.BoxGeometry(width, height, depth);
                 var material = new THREE.MeshBasicMaterial({color: 0xffffff});
@@ -49,14 +59,14 @@
             var scene = new THREE.Scene();
             var objs = [];
             var camera;
-            if (window.innerWidth > window.innerHeight) {
-                camera = new THREE.OrthographicCamera(-20 * window.innerWidth / window.innerHeight, 20 * window.innerWidth / window.innerHeight, 20, -20, 0.1, 1000);
-            } else {
-                camera = new THREE.OrthographicCamera(-20, 20, 20 * window.innerHeight / window.innerWidth, -20 * window.innerHeight / window.innerWidth, 0.1, 1000);
-            }
+            
             var renderer = new THREE.WebGLRenderer();
-            renderer.setSize( window.innerWidth, window.innerHeight );
-            document.body.appendChild( renderer.domElement );
+            
+            var canvas = renderer.domElement;
+            document.body.appendChild(canvas);
+            
+            updateScreenSize();
+            
             var boxes = [null, null, null, null];
             for (var i = 0; i < 4; i++) {
                 boxes[i] = new ColorBox(2, 2, 0.1);
@@ -79,14 +89,14 @@
             render();
             
             document.onclick = function (event) {
-                    var coordX = event.clientX / (window.innerWidth / 2) - 1;
-                    var coordY = -1 * (event.clientY / (window.innerHeight / 2) - 1);
+                    var coordX = event.clientX / (width / 2) - 1;
+                    var coordY = -1 * ((event.clientY + document.body.scrollTop) / (height / 2) - 1);
                     var mouseClick = new THREE.Vector3(coordX, coordY, 0);
                     
                     mouseClick.unproject(camera); // get the coordinates in 3D space
                     mouseClick.setZ(0);
                     
-                    // The normal vector happens to be <0, 0, -1> for the camera. If the camera moves, that will change.
+                    // The normal vector happens to be <0, 0, -1> for the camera. If the camera tilts, that will change.
                     var ray = new THREE.Raycaster(mouseClick, new THREE.Vector3(0, 0, -1));
                     var intersections = ray.intersectObjects(objs);
                     

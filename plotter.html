@@ -48,7 +48,12 @@
         
             var scene = new THREE.Scene();
             var objs = [];
-            var camera = new THREE.PerspectiveCamera( 90, window.innerWidth/window.innerHeight, 0.1, 1000 );
+            var camera;
+            if (window.innerWidth > window.innerHeight) {
+                camera = new THREE.OrthographicCamera(-20 * window.innerWidth / window.innerHeight, 20 * window.innerWidth / window.innerHeight, 20, -20, 0.1, 1000);
+            } else {
+                camera = new THREE.OrthographicCamera(-20, 20, 20 * window.innerHeight / window.innerWidth, -20 * window.innerHeight / window.innerWidth, 0.1, 1000);
+            }
             var renderer = new THREE.WebGLRenderer();
             renderer.setSize( window.innerWidth, window.innerHeight );
             document.body.appendChild( renderer.domElement );
@@ -76,13 +81,13 @@
             document.onclick = function (event) {
                     var coordX = event.clientX / (window.innerWidth / 2) - 1;
                     var coordY = -1 * (event.clientY / (window.innerHeight / 2) - 1);
-                    var mouseDir = new THREE.Vector3(coordX, coordY, 0.5);
+                    var mouseClick = new THREE.Vector3(coordX, coordY, 0);
                     
-                    mouseDir.unproject(camera); // get the coordinates in 3D space
-                    mouseDir.sub(camera.position); // get a vector pointing from the camera to the mouseclick (unchanged since the camera is at (0, 0, 0))
-                    mouseDir.normalize(); // make its magnitude 1
+                    mouseClick.unproject(camera); // get the coordinates in 3D space
+                    mouseClick.setZ(0);
                     
-                    var ray = new THREE.Raycaster(camera.position, mouseDir);
+                    // The normal vector happens to be <0, 0, -1> for the camera. If the camera moves, that will change.
+                    var ray = new THREE.Raycaster(mouseClick, new THREE.Vector3(0, 0, -1));
                     var intersections = ray.intersectObjects(objs);
                     
                     var obj;

@@ -1,4 +1,9 @@
-function Cache () {
+/** The Cache class represents the second layer of cache. The only methods for
+    external use are ensureData and limitMemory. Dynamic loading of data is not
+    fully implemented, but some instance fields for that purpose have been
+    declared and some methods implemented. */
+
+function Cache (requester) {
     /* The dataCache maps UUID to an object that maps the point width exponent to
        cached data. The array contains cached entries, objects that store a start
        time, end time, and data; the cached entries never overlap, are consolidated
@@ -12,8 +17,6 @@ function Cache () {
     this.pollingBrackets = false; // whether or not we are periodically checking if the brackets have changed
     this.bracketInterval = 5000;
     
-    this.dataURLStart = 'http://bunker.cs.berkeley.edu/backend/api/data/uuid/';
-    
     this.queryLow = 0;//-1152921504606; // in milliseconds
     this.queryHigh = 3458764513820; // in milliseconds
     this.pweHigh = 61;
@@ -24,6 +27,9 @@ function Cache () {
     this.pendingSecondaryRequests = 0;
     this.pendingSecondaryRequestData = {};
     this.pendingRequests = 0;
+    
+    // So we can make the requests for data when necessary
+    this.requester = requester;
 }
 
 /* The start time and end time are in MILLISECONDS, not NANOSECONDS! */
@@ -107,10 +113,8 @@ function validateContiguous(cacheEntry, pwe) {
    floor(lg(POINTWIDTH)). If it does not, data are procured from the server and
    added to the cache so the extent of its data is at least from STARTTIME to
    ENDTIME. STARTTIME and ENDTIME are specified in UTC (Universal Coord. Time).
-   Once the data is found or procured, CALLBACK is called with an array of data
-   as its first argument, where the requested data is a subset of the requested
-   data (second and third arguments are the start and end time of the cache
-   entry, used for the data density plot). If another call to this function is
+   Once the data is found or procured, CALLBACK is called with the Cache Entry
+   containing the data as its argument. If another call to this function i
    pending (it has requested data from the server) for a certain stream, any
    more calls for that stream will not result in a GET request (so this
    function doesn't fall behind user input). */
@@ -287,7 +291,7 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
         var startsBefore = indices[2];
         var endsAfter = indices[3];
         if (i == j && !startsBefore && !endsAfter) {
-            callback(cache[i].cached_data, cache[i].start_time, cache[i].end_time);
+            callback(cache[i]);
             return;
         }
         var dataBefore;
@@ -334,7 +338,7 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
         this.loadedData += cacheEntry.cached_data.length;
         loadedStreams[uuid] += cacheEntry.cached_data.length;
         cache.splice(i, j - i + 1, cacheEntry);
-        callback(cacheEntry.cached_data, cacheEntry.start_time, cacheEntry.end_time);
+        callback(cacheEntry);
     };
 
 /* Given CACHE, an array of cache entries, and a STARTTIME and an ENDTIME,

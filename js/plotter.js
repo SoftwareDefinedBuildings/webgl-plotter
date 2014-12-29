@@ -4,10 +4,12 @@ function Plotter() {
     this.camera = undefined;
     this.canvas = this.renderer.domElement;
     this.hToW = 1;
-    this.updateScreenSize();
     this.clickables = [];
     
-    window.onresize = this.updateScreenSize;
+    var self = this; // for callbacks where "this" is different
+    window.onresize = function () {
+            self.updateScreenSize();
+        };
     
     var boxes = [null, null, null, null];
     for (var i = 0; i < 4; i++) {
@@ -24,12 +26,12 @@ function Plotter() {
     boxes[1].setTarget(boxes[2]);
     boxes[2].setTarget(boxes[1]);
 
-    
-    var self = this;
     var render = function () {
             requestAnimationFrame(render);
             self.renderer.render(self.scene, self.camera);
         };
+        
+    this.updateScreenSize();
         
     render(); // start rendering
     

@@ -1,5 +1,10 @@
-function ColorBox(width, height, depth) { // implements Clickable
-    var geom = new THREE.BoxGeometry(width, height, depth);
+function ColorBox(width, height, centerX, centerY, centerZ) { // implements Clickable
+    var geom = new THREE.Geometry();
+    geom.vertices.push(new THREE.Vector3(centerX - 1, centerY - 1, centerZ),
+        new THREE.Vector3(centerX + 1, centerY - 1, centerZ),
+        new THREE.Vector3(centerX + 1, centerY + 1, centerZ),
+        new THREE.Vector3(centerX - 1, centerY + 1, centerZ));
+    geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial({color: 0xffffff});
     this.obj = new THREE.Mesh(geom, material);
     this.obj.wrapper = this; // an extra parameter I'm adding

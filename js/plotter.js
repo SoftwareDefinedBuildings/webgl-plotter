@@ -10,16 +10,18 @@ function Plotter() {
     window.onresize = function () {
             self.updateScreenSize();
         };
+        
+    this.plot = new Plot(this);
     
     var boxes = [null, null, null, null];
+    boxes[0] = new ColorBox(2, 2, -10, -10, -20);
+    boxes[1] = new ColorBox(2, 2, 10, -10, -20);
+    boxes[2] = new ColorBox(2, 2, -10, 10, -20);
+    boxes[3] = new ColorBox(2, 2, 10, 10, -20);
+    
     for (var i = 0; i < 4; i++) {
-        boxes[i] = new ColorBox(2, 2, 0.1);
         boxes[i].addToPlotter(this);
     }
-    boxes[0].setPosition(-10, -10, -20);
-    boxes[1].setPosition(10, -10, -20);
-    boxes[2].setPosition(-10, 10, -20);
-    boxes[3].setPosition(10, 10, -20);
     
     boxes[0].setTarget(boxes[3]);
     boxes[3].setTarget(boxes[0]);

@@ -6,18 +6,18 @@ function Plotter() {
     this.hToW = 1;
     this.clickables = [];
     
+    this.VIRTUAL_WIDTH = 200; // The width of the plotter in virtual coordinates
+    
     var self = this; // for callbacks where "this" is different
     window.onresize = function () {
             self.updateScreenSize();
         };
-        
-    this.plot = new Plot(this);
     
     var boxes = [null, null, null, null];
-    boxes[0] = new ColorBox(2, 2, -10, -10, -20);
-    boxes[1] = new ColorBox(2, 2, 10, -10, -20);
-    boxes[2] = new ColorBox(2, 2, -10, 10, -20);
-    boxes[3] = new ColorBox(2, 2, 10, 10, -20);
+    boxes[0] = new ColorBox(2, 2, -10, -10, 0);
+    boxes[1] = new ColorBox(2, 2, 10, -10, 0);
+    boxes[2] = new ColorBox(2, 2, -10, -30, 0);
+    boxes[3] = new ColorBox(2, 2, 10, -30, 0);
     
     for (var i = 0; i < 4; i++) {
         boxes[i].addToPlotter(this);
@@ -55,6 +55,12 @@ function Plotter() {
                 intersections[0].object.wrapper.click();
             }
         });
+        
+    this.plot = new Plot(this, 2, 0.5, -100, 0);
+    
+    this.selectedStreams = []; // Until we have a working UI, we'll populate this manually.
+    this.startTime = 1417881807235;
+    this.endTime = 1418167958593;
 }
 
 Plotter.prototype.updateScreenSize = function () {
@@ -62,7 +68,7 @@ Plotter.prototype.updateScreenSize = function () {
         this.canvas.style.width = this.width;
         this.height = this.hToW * this.width;
         this.canvas.style.height = this.height;
-        this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 1, 1000);
+        this.camera = new THREE.PerspectiveCamera(90, this.width / this.height, 1, 1000);
         this.camera.position.z = 100;
         this.renderer.setSize(this.width, this.height);
     };

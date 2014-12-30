@@ -5,7 +5,7 @@ function ColorBox(width, height, centerX, centerY, centerZ) { // implements Clic
         new THREE.Vector3(centerX + 1, centerY + 1, centerZ),
         new THREE.Vector3(centerX - 1, centerY + 1, centerZ));
     geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
-    var material = new THREE.MeshBasicMaterial({color: 0xffffff});
+    var material = new THREE.MeshBasicMaterial({color: 0x00ffff});
     this.obj = new THREE.Mesh(geom, material);
     this.obj.wrapper = this; // an extra parameter I'm adding
     this.target = null;
@@ -27,7 +27,7 @@ ColorBox.prototype.setTarget = function (otherBox) {
 
 ColorBox.prototype.click = function () {
     if (this.target.selected) {
-        this.target.obj.material.setValues({color: 0xffffff});
+        this.target.obj.material.setValues({color: 0x00ffff});
         this.target.selected = false;
     } else {
         this.target.obj.material.setValues({color: 0xff0000});

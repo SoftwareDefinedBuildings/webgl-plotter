@@ -17,9 +17,9 @@ function Cache (requester) {
     this.pollingBrackets = false; // whether or not we are periodically checking if the brackets have changed
     this.bracketInterval = 5000;
     
-    this.queryLow = 0;//-1152921504606; // in milliseconds
-    this.queryHigh = 3458764513820; // in milliseconds
-    this.pweHigh = 61;
+    this.queryLow = [-1152921504607, 153025];
+    this.queryHigh = [3458764513820, 540927];
+    this.pweHigh = 62;
     
     // The following fields are for rate control
     this.currPWE = undefined;
@@ -32,7 +32,7 @@ function Cache (requester) {
     this.requester = requester;
 }
 
-/* The start time and end time are in MILLISECONDS, not NANOSECONDS! */
+/* The start time and end time are two-element arrays. */
 function CacheEntry(startTime, endTime, data) {
     this.start_time = startTime;
     this.end_time = endTime;
@@ -120,10 +120,21 @@ function validateContiguous(cacheEntry, pwe) {
    function doesn't fall behind user input). */
 Cache.prototype.ensureData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
-        var halfPWnanos = Math.pow(2, pointwidthexp - 1) - 1;
-        var halfPWmillis = halfPWnanos / 1000000;
-        startTime = Math.min(Math.max(startTime, this.queryLow + Math.ceil(halfPWmillis)), this.queryHigh - Math.ceil(halfPWmillis) - 1);
-        endTime = Math.min(Math.max(endTime, this.queryLow + Math.ceil(halfPWmillis) + 1), this.queryHigh - Math.ceil(halfPWmillis));
+        var halfPW = expToPW(pointwidthexp - 1);
+        var startlow = [this.queryLow[0], this.queryLow[1]];
+        var endlow = [this.queryLow[0], this.queryLow[1]];
+        var starthigh = [this.queryHigh[0], this.queryHigh[1]];
+        var endhigh = [this.queryHigh[0], this.queryHigh[1]];
+        
+        addTimes(startlow, halfPW);
+        addTimes(endlow, halfPW);
+        addTimes(endlow, [0, 1]);
+        subTimes(starthigh, halfPW);
+        subTimes(starthigh, [0, 1]);
+        subTimes(endhigh, halfPW);
+        
+        startTime = boundToRange(startTime, startlow, starthigh);//Math.min(Math.max(startTime, this.queryLow + Math.ceil(halfPWmillis)), this.queryHigh - Math.ceil(halfPWmillis) - 1);
+        endTime = boundToRange(endTime, endlow, endhigh);//Math.min(Math.max(endTime, this.queryLow + Math.ceil(halfPWmillis) + 1), this.queryHigh - Math.ceil(halfPWmillis));
         var dataCache = this.dataCache;
         // Create the mapping for this stream if it isn't already present
         if (!dataCache.hasOwnProperty(uuid)) {
@@ -149,7 +160,7 @@ Cache.prototype.ensureData = function (uuid, pointwidthexp, startTime, endTime, 
         
         var numRequests = j - i + startsBefore + endsAfter;    
         if (numRequests == 0) {
-            callback(cache[i].cached_data, cache[i].start_time, cache[i].end_time);
+            callback(cache[i]);
         } else {
             // Fetch the data between the cache entries, and consolidate into one entry
             var si = i;
@@ -177,7 +188,7 @@ Cache.prototype.ensureData = function (uuid, pointwidthexp, startTime, endTime, 
                 };
             
             if (numRequests == 1) {
-                this.makeDataRequest(uuid, queryStart, queryEnd, pointwidthexp, halfPWnanos, urlCallback, caching);
+                this.makeDataRequest(uuid, queryStart, queryEnd, pointwidthexp, halfPW, urlCallback, caching);
             } else {
                 if (startsBefore) {
                     i--;
@@ -185,27 +196,27 @@ Cache.prototype.ensureData = function (uuid, pointwidthexp, startTime, endTime, 
                 if (endsAfter) {
                     j++;
                 }
-                this.makeDataRequest(uuid, queryStart, cache[i + 1].start_time, pointwidthexp, halfPWnanos, urlCallback, caching);
+                this.makeDataRequest(uuid, queryStart, cache[i + 1].start_time, pointwidthexp, halfPW, urlCallback, caching);
                 for (var k = i + 1; k < j - 1; k++) {
-                    this.makeDataRequest(uuid, cache[k].end_time, cache[k + 1].start_time, pointwidthexp, halfPWnanos, urlCallback, caching);
+                    this.makeDataRequest(uuid, cache[k].end_time, cache[k + 1].start_time, pointwidthexp, halfPW, urlCallback, caching);
                 }
-                this.makeDataRequest(uuid, cache[j - 1].end_time, queryEnd, pointwidthexp, halfPWnanos, urlCallback, caching);
+                this.makeDataRequest(uuid, cache[j - 1].end_time, queryEnd, pointwidthexp, halfPW, urlCallback, caching);
             }
         }
     };
 
 /* Gets all the points where the middle of the interval is between queryStart
    and queryEnd, including queryStart but not queryEnd. HALFPWNANOS should be
-   Math.pow(2, pointwidthexp - 1) - 1. */
+   Math.pow(2, pointwidthexp - 1). */
 Cache.prototype.makeDataRequest = function (uuid, queryStart, queryEnd, pointwidthexp, halfpwnanos, callback, caching) {
         /* queryStart and queryEnd are the start and end of the query I want,
         in terms of the midpoints of the intervals I get back; the real archiver
         will give me back all intervals that touch the query range. So I shrink
         the range by half a pointwidth on each side to compensate for that. */
-        var halfpwmillisStart = Math.floor(halfpwnanos / 1000000);
-        var halfpwnanosStart = halfpwnanos - (1000000 * halfpwmillisStart);
-        halfpwnanosStart = (1000000 + halfpwnanosStart).toString().slice(1);
-        var req = uuid + '?starttime=' + (queryStart + halfpwmillisStart) + halfpwnanosStart + '&endtime=' + (queryEnd + halfpwmillisStart) + halfpwnanosStart + '&unitoftime=ns&pw=' + pointwidthexp;
+        var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
+        var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
+        
+        var req = uuid + '?starttime=' + timeToStr(trueStart) + '&endtime=' + timeToStr(trueEnd) + '&unitoftime=ns&pw=' + pointwidthexp;
         if (caching) {
             this.requester.makeDataRequest(req, function (data) {
                     callback(data, queryStart, queryEnd);
@@ -308,8 +319,8 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
             dataBefore = cache[i].cached_data;
             if (data.length > 0) {
                 // We want to get rid of overlap
-                m = binSearch(data, cache[i].end_time, function (d) { return d[0]; });
-                if (data[m][0] < cache[i].end_time) {
+                m = binSearchCmp(data, cache[i].end_time, cmpTimes);
+                if (cmpTimes(data[m], cache[i].end_time) < 0) {
                     m++;
                 }
             }
@@ -322,8 +333,8 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
             dataAfter = cache[j].cached_data;
             if (data.length > 0) {
                 // We want to get rid of overlap
-                n = binSearch(data, cache[j].start_time, function (d) { return d[0]; })
-                if (data[n][0] >= cache[j].start_time) {
+                n = binSearchCmp(data, cache[j].start_time, cmpTimes)
+                if (cmpTimes(data[n], cache[j].start_time) >= 0) {
                     n--;
                 }
                 n++;
@@ -361,15 +372,15 @@ function getIndices(cache, startTime, endTime) {
     var i, j;
     if (cache.length > 0) {
         // Try to find the cache entry with data, or determine if there is no such entry
-        i = binSearch(cache, startTime, function (entry) { return entry.start_time; });
-        if (startTime < cache[i].start_time) {
+        i = binSearchCmp(cache, startTime, cmpTimes);
+        if (cmpTimes(startTime, cache[i].start_time) < 0) {
             i--;
         } // Now, startTime is either in entry at index i, or between index i and i + 1, or at the very beginning
         if (i == -1) {
             // new data starts before all existing records
             i = 0;
             startsBefore = true;
-        } else if (startTime <= cache[i].end_time) {
+        } else if (cmpTimes(startTime, cache[i].end_time) <= 0) {
             // new data starts in cache entry at index i
             startsBefore = false;
         } else {
@@ -378,15 +389,15 @@ function getIndices(cache, startTime, endTime) {
             i++; // so we don't delete the entry at index i
         }
         
-        j = binSearch(cache, endTime, function (entry) { return entry.end_time; }); // endTime is either in entry at index j, or between j - 1 and j, or between j and j + 1
-        if (endTime > cache[j].end_time) {
+        j = binSearchCmp(cache, endTime, cmpTimes); // endTime is either in entry at index j, or between j - 1 and j, or between j and j + 1
+        if (cmpTimes(endTime, cache[j].end_time)) {
             j++;
         } // Now, endTime is either in entry at index j, or between index j - 1 and j, or at the very end
         if (j == cache.length) {
             // new data ends after all existing records
             j -= 1;
             endsAfter = true;
-        } else if (endTime >= cache[j].start_time) {
+        } else if (cmpTimes(endTime, cache[j].start_time) >= 0) {
             // new data ends in cache entry at index j
             endsAfter = false;
         } else {
@@ -419,13 +430,13 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                     if (entries.length == 0) {
                         continue;
                     }
-                    var index = binSearch(entries, lastTime, function (entry) { return entry.start_time; });
-                    if (index > 0 && entries[index].start_time > lastTime && entries[index - 1].end_time > lastTime) {
+                    var index = binSearchCmp(entries, lastTime, cmpTimes);
+                    if (index > 0 && cmpTimes(entries[index].start_time, lastTime) > 0 && cmpTimes(entries[index - 1].end_time, lastTime) > 0) {
                         index--;
                     }
-                    if (entries[index].start_time <= lastTime && (data = entries[index].cached_data).length > 0) {
-                        var entryIndex = binSearch(data, lastTime, function (point) { return point[0]; });
-                        if (data[entryIndex][0] <= lastTime) {
+                    if (cmpTimes(entries[index].start_time, lastTime) <= 0 && (data = entries[index].cached_data).length > 0) {
+                        var entryIndex = binSearchCmp(data, lastTime, cmpTimes);
+                        if (cmpTimes(data[entryIndex], lastTime) <= 0) {
                             entryIndex++;
                         }
                         entries[index].end_time = lastTime;
@@ -445,17 +456,17 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
 
 /* Reduce memory consumption by removing some cached data. STARTTIME and
    ENDTIME are in UTC (Universal Coord. Time) and represent the extent of the
-   current view (so the presently viewed data is not erased). If current memory
+   current view (so the presently viewed data is not erased). CURRPWE is the
+   pointwidth at which the data is currently being viewed. If current memory
    consumption is less than THRESHOLD, nothing will happen; otherwise, memory
    comsumption is decreased to TARGET or lower. Returns true if memory
    consumption was decreased; otherwise, returns false. */
-Cache.prototype.limitMemory = function (streams, startTime, endTime, threshold, target) {
+Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, threshold, target) {
         if (this.loadedData < threshold) {
             return false;
         }
         var dataCache = this.dataCache;
         var loadedStreams = this.loadedStreams;
-        var currPWE = getPWExponent((endTime - startTime) / this.WIDTH); // PWE stands for point width exponent
         var i, j, k;
         
         // Delete extra streams
@@ -471,9 +482,9 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, threshold, 
                     }
                 }
                 if (!used) {
-                    this.loadedData -= loadedStreams[uuid];
-                    delete dataCache[uuid];
-                    delete loadedStreams[uuid];
+                    this.loadedData -= this.loadedStreams[uuid];
+                    delete this.dataCache[uuid];
+                    delete this.loadedStreams[uuid];
                     if (this.lastTimes.hasOwnProperty(uuid)) {
                         delete this.lastTimes[uuid];
                     }
@@ -536,7 +547,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, threshold, 
             pwdata = dataCache[streams[i].uuid][currPWE];
             pwcount = 0;
             for (j = pwdata.length - 1; j >= 0; j--) {
-                if ((pwdata[j].start_time <= startTime && pwdata[j].end_time >= endTime) || (pwdata[j].start_time >= startTime && pwdata[j].start_time <= endTime) || (pwdata[j].end_time >= startTime && pwdata[j].end_time <= endTime)) {
+                if ((cmpTimes(pwdata[j].start_time, startTime) <= 0 && cmpTimes(pwdata[j].end_time, endTime) >= 0) || (cmpTimes(pwdata[j].start_time, startTime) >= 0 && cmpTimes(pwdata[j].start_time, endTime) <= 0) || (cmpTimes(pwdata[j].end_time, startTime) >= 0 && cmpTimes(pwdata[j].end_time, endTime) <= 0)) {
                     continue; // This is the cache entry being displayed; we won't delete it
                 }
                 pwcount += pwdata[j].cached_data.length;
@@ -553,16 +564,16 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, threshold, 
         for (i = 0; i < streams.length; i++) {
             pwdata = dataCache[streams[i].uuid][currPWE][0].cached_data;
             this.loadedData -= pwdata.length;
-            loadedStreams[streams[i].uuid] -= pwdata.length; // this should be 0, but I'm subtracting in case there's an edge case where there are multiple cache entries left even now
-            j = binSearch(pwdata, startTime, function (d) { return d[0]; });
-            k = binSearch(pwdata, endTime, function (d) { return d[0]; });
-            if (pwdata[j][0] >= startTime && j > 0) {
+            loadedStreams[streams[i].uuid] -= pwdata.length; // this should be 0 now
+            j = binSearchCmp(pwdata, startTime, cmpTimes);
+            k = binSearchCmp(pwdata, endTime, cmpTimes);
+            if (cmpTimes(pwdata[j], startTime) >= 0 && j > 0) {
                 j--;
             }
-            if (pwdata[k][0] <= endTime && k < pwdata.length - 1) {
+            if (cmpTimes(pwdata[k], endTime) <= 0 && k < pwdata.length - 1) {
                 k++;
             }
-            dataCache[streams[i].uuid][currPWE][0] = new CacheEntry(pwdata[j][0], pwdata[k][0], pwdata.slice(j, k));
+            dataCache[streams[i].uuid][currPWE][0] = new CacheEntry([pwdata[j][0], pwdata[j][1]], [pwdata[k][0], pwdata[k][1]], pwdata.slice(j, k));
             loadedStreams[streams[i].uuid] += (k - j);
             this.loadedData += (k - j);
         }

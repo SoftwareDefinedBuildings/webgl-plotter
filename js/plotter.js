@@ -55,12 +55,15 @@ function Plotter() {
                 intersections[0].object.wrapper.click();
             }
         });
+    
+    // all requests for external resources are done through the Requester
+    this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
         
     this.plot = new Plot(this, 2, 0.5, -100, 0);
     
-    this.selectedStreams = []; // Until we have a working UI, we'll populate this manually.
-    this.startTime = 1417881807235;
-    this.endTime = 1418167958593;
+    this.selectedStreams = [{uuid: "01e8bb73-723e-44a0-9c08-036d60320ecb"}]; // Until we have a working UI, we'll populate this manually.
+    this.selectedStartTime = [1404266401000, 0];
+    this.selectedEndTime = [1427831998000, 0];
 }
 
 Plotter.prototype.updateScreenSize = function () {

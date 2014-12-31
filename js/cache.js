@@ -118,7 +118,7 @@ function validateContiguous(cacheEntry, pwe) {
    pending (it has requested data from the server) for a certain stream, any
    more calls for that stream will not result in a GET request (so this
    function doesn't fall behind user input). */
-Cache.prototype.ensureData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
+Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
         var halfPW = expToPW(pointwidthexp - 1);
         var startlow = [this.queryLow[0], this.queryLow[1]];

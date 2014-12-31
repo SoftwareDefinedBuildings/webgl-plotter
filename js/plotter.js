@@ -1,6 +1,6 @@
 function Plotter() {
     this.scene = new THREE.Scene();
-    this.renderer = new THREE.WebGLRenderer();
+    this.renderer = new THREE.WebGLRenderer({antialias: true});
     this.camera = undefined;
     this.canvas = this.renderer.domElement;
     this.hToW = 1;

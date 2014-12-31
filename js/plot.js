@@ -135,6 +135,8 @@ Plot.prototype.drawGraph2 = function () {
     
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
+        var THICKNESS = 0.2;
+        
         // For now, just draw the visible region.
         var data;
         var i;
@@ -142,19 +144,25 @@ Plot.prototype.drawGraph3 = function () {
         var vertexID;
         var normal = new THREE.Vector3();
         var graph;
+        var points;
+        var pointgeom;
+        var pointobj;
         var mesh;
         var plot = new THREE.Object3D();
         var geometries = [];
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 graph = new THREE.Geometry();
+                points = new THREE.Object3D();
                 data = this.drawingCache[uuid].cached_data;
                 i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
                 x = this.xAxis.map(data[i]);
                 y = this.yAxis.map(data[i++][3]);
                 graph.vertices.push(new THREE.Vector3(x, y, 0));
                 graph.vertices.push(new THREE.Vector3(x, y, 0));
-                vertexID = 2;
+                graph.vertices.push(new THREE.Vector3(x, y, 0));
+                graph.vertices.push(new THREE.Vector3(x, y, 0));
+                vertexID = 4;
                 do {
                     x = this.xAxis.map(data[i]);
                     y = this.yAxis.map(data[i][3]);
@@ -163,13 +171,18 @@ Plot.prototype.drawGraph3 = function () {
                     graph.vertices.push(new THREE.Vector3(x, y, 0));
                     graph.vertices.push(new THREE.Vector3(x, y, 0));
                     graph.vertices.push(new THREE.Vector3(x, y, 0));
+                    pointgeom = new THREE.CircleGeometry(THICKNESS, 6);
+                    geometries.push(pointgeom);
+                    pointobj = new THREE.Mesh(pointgeom, new THREE.MeshBasicMaterial({color: 0x0000ff}));
+                    pointobj.position.copy(new THREE.Vector3(x, y, 0));
+                    points.add(pointobj);
                     
                     vertexID += 4;
                     
                     normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
                     normal.applyMatrix3(this.rotator);
                     normal.normalize();
-                    normal.divideScalar(10);
+                    normal.multiplyScalar(THICKNESS);
                     
                     graph.vertices[vertexID - 6].add(normal);
                     graph.vertices[vertexID - 5].sub(normal);
@@ -198,6 +211,7 @@ Plot.prototype.drawGraph3 = function () {
         this.geometries = geometries;
         this.plot = plot;
         this.plotter.scene.add(plot);
+        this.plotter.scene.add(points);
     };
 
 Plot.prototype.resizeToMargins = function () {

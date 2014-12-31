@@ -61,9 +61,9 @@ function Plotter() {
         
     this.plot = new Plot(this, 2, 0.5, -100, 0);
     
-    this.selectedStreams = [{uuid: "01e8bb73-723e-44a0-9c08-036d60320ecb"}]; // Until we have a working UI, we'll populate this manually.
-    this.selectedStartTime = [1404266401000, 0];
-    this.selectedEndTime = [1427831998000, 0];
+    this.selectedStreams = [{uuid: "abffcf07-9e17-404a-98c3-ea4d60042ff3"}]; // Until we have a working UI, we'll populate this manually.
+    this.selectedStartTime = [1415942251000, 0];
+    this.selectedEndTime = [1416278894000, 0];
 }
 
 Plotter.prototype.updateScreenSize = function () {

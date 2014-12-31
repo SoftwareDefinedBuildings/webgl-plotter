@@ -46,6 +46,13 @@ function Plot (plotter, outermargin, hToW, x, y) {
     
     // create the second level of cache
     this.dataCache = new Cache(plotter.requester);
+    
+    // a useful matrix
+    this.rotator = new THREE.Matrix3();
+    this.rotator.set(0, -1, 0, 1, 0, 0, 0, 0, 1);
+    
+    // geometries currently being displayed
+    this.geometries = [];
 }
 
 /** Just draw the same data again with the new x-axis. In other words, we just
@@ -64,7 +71,7 @@ Plot.prototype.fullUpdate = function (callback) {
         
         var leftVect = this.plotspGeom.vertices[0].clone().project(this.plotter.camera);
         var rightVect = this.plotspGeom.vertices[1].clone().project(this.plotter.camera);
-        var numPixels = rightVect.sub(leftVect).length();
+        var numPixels = rightVect.sub(leftVect).length() * this.plotter.width;
         
         this.pwe = getPWExponent(mulTime(nanoDiff, 1 / numPixels));
         
@@ -128,6 +135,69 @@ Plot.prototype.drawGraph2 = function () {
     
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
+        // For now, just draw the visible region.
+        var data;
+        var i;
+        var x;
+        var vertexID;
+        var normal = new THREE.Vector3();
+        var graph;
+        var mesh;
+        var plot = new THREE.Object3D();
+        var geometries = [];
+        for (var uuid in this.drawingCache) {
+            if (this.drawingCache.hasOwnProperty(uuid)) {
+                graph = new THREE.Geometry();
+                data = this.drawingCache[uuid].cached_data;
+                i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
+                x = this.xAxis.map(data[i]);
+                y = this.yAxis.map(data[i++][3]);
+                graph.vertices.push(new THREE.Vector3(x, y, 0));
+                graph.vertices.push(new THREE.Vector3(x, y, 0));
+                vertexID = 2;
+                do {
+                    x = this.xAxis.map(data[i]);
+                    y = this.yAxis.map(data[i][3]);
+                    
+                    graph.vertices.push(new THREE.Vector3(x, y, 0));
+                    graph.vertices.push(new THREE.Vector3(x, y, 0));
+                    graph.vertices.push(new THREE.Vector3(x, y, 0));
+                    graph.vertices.push(new THREE.Vector3(x, y, 0));
+                    
+                    vertexID += 4;
+                    
+                    normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
+                    normal.applyMatrix3(this.rotator);
+                    normal.normalize();
+                    normal.divideScalar(10);
+                    
+                    graph.vertices[vertexID - 6].add(normal);
+                    graph.vertices[vertexID - 5].sub(normal);
+                    graph.vertices[vertexID - 4].add(normal);
+                    graph.vertices[vertexID - 3].sub(normal);
+                    
+                    // It seems that faces only show up if you traverse their vertices counterclockwise
+                    graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                    graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                    
+                    i++;
+                } while (i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0);
+                graph.verticesNeedUpdate = true;
+                graph.elementsNeedUpdate = true;
+                mesh = new THREE.Mesh(graph, new THREE.MeshBasicMaterial({color: 0x0000ff}));
+                plot.add(mesh);
+                geometries.push(graph);
+            }
+        }
+        if (this.plot != undefined) {
+            this.plotter.scene.remove(this.plot);
+        }
+        for (i = 0; i < this.geometries.length; i++) {
+            this.geometries[i].dispose();
+        }
+        this.geometries = geometries;
+        this.plot = plot;
+        this.plotter.scene.add(plot);
     };
 
 Plot.prototype.resizeToMargins = function () {

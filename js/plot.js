@@ -48,8 +48,10 @@ function Plot (plotter, outermargin, hToW, x, y) {
     this.dataCache = new Cache(plotter.requester);
     
     // a useful matrix
-    this.rotator = new THREE.Matrix3();
-    this.rotator.set(0, -1, 0, 1, 0, 0, 0, 0, 1);
+    this.rotator90 = new THREE.Matrix3();
+    this.rotator90.set(0, -1, 0, 1, 0, 0, 0, 0, 1);
+    this.rotator60 = new THREE.Matrix3();
+    this.rotator60.set(0.5, -Math.sqrt(3) / 2, 0, Math.sqrt(3) / 2, 0.5, 0, 0, 0, 1);
     
     // geometries currently being displayed
     this.geometries = [];
@@ -136,24 +138,30 @@ Plot.prototype.drawGraph2 = function () {
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
         var THICKNESS = 0.2;
+        var transforms = [];
+        var i, j;
+        transforms.push(new THREE.Vector3(THICKNESS, 0, 0));
+        for (i = 1; i < 6; i++) {
+            transforms[i] = transforms[i - 1].clone();
+            transforms[i].applyMatrix3(this.rotator60);
+        }
         
         // For now, just draw the visible region.
         var data;
-        var i;
         var x;
         var vertexID;
+        var pointID;
         var normal = new THREE.Vector3();
         var graph;
         var points;
-        var pointgeom;
-        var pointobj;
+        var pvect;
         var mesh;
         var plot = new THREE.Object3D();
         var geometries = [];
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 graph = new THREE.Geometry();
-                points = new THREE.Object3D();
+                points = new THREE.Geometry();
                 data = this.drawingCache[uuid].cached_data;
                 i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
                 x = this.xAxis.map(data[i]);
@@ -163,6 +171,12 @@ Plot.prototype.drawGraph3 = function () {
                 graph.vertices.push(new THREE.Vector3(x, y, 0));
                 graph.vertices.push(new THREE.Vector3(x, y, 0));
                 vertexID = 4;
+                for (j = 0; j < 6; j++) {
+                    pvect = new THREE.Vector3(x, y, 0);
+                    pvect.add(transforms[j]);
+                    points.vertices.push(pvect);
+                }
+                pointID = 6;
                 do {
                     x = this.xAxis.map(data[i]);
                     y = this.yAxis.map(data[i][3]);
@@ -171,16 +185,19 @@ Plot.prototype.drawGraph3 = function () {
                     graph.vertices.push(new THREE.Vector3(x, y, 0));
                     graph.vertices.push(new THREE.Vector3(x, y, 0));
                     graph.vertices.push(new THREE.Vector3(x, y, 0));
-                    pointgeom = new THREE.CircleGeometry(THICKNESS, 6);
-                    geometries.push(pointgeom);
-                    pointobj = new THREE.Mesh(pointgeom, new THREE.MeshBasicMaterial({color: 0x0000ff}));
-                    pointobj.position.copy(new THREE.Vector3(x, y, 0));
-                    points.add(pointobj);
                     
                     vertexID += 4;
                     
+                    for (j = 0; j < 6; j++) {
+                        pvect = new THREE.Vector3(x, y, 0);
+                        pvect.add(transforms[j]);
+                        points.vertices.push(pvect);
+                    }
+                    
+                    pointID += 6;
+                    
                     normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
-                    normal.applyMatrix3(this.rotator);
+                    normal.applyMatrix3(this.rotator90);
                     normal.normalize();
                     normal.multiplyScalar(THICKNESS);
                     
@@ -193,13 +210,21 @@ Plot.prototype.drawGraph3 = function () {
                     graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
                     graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
                     
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));
+                    
                     i++;
                 } while (i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0);
                 graph.verticesNeedUpdate = true;
                 graph.elementsNeedUpdate = true;
                 mesh = new THREE.Mesh(graph, new THREE.MeshBasicMaterial({color: 0x0000ff}));
                 plot.add(mesh);
+                mesh = new THREE.Mesh(points, new THREE.MeshBasicMaterial({color: 0x0000ff}));
+                plot.add(mesh);
                 geometries.push(graph);
+                geometries.push(points);
             }
         }
         if (this.plot != undefined) {
@@ -211,7 +236,6 @@ Plot.prototype.drawGraph3 = function () {
         this.geometries = geometries;
         this.plot = plot;
         this.plotter.scene.add(plot);
-        this.plotter.scene.add(points);
     };
 
 Plot.prototype.resizeToMargins = function () {

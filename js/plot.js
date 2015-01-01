@@ -148,21 +148,20 @@ Plot.prototype.drawGraph3 = function () {
         
         // For now, just draw the visible region.
         var data;
-        var x;
+        var t1000, tMillis, tNanos;
         var vertexVect;
         var vertexID;
         var pointID;
         var normal;
         var graph;
         var tempTime;
-        //var points;
-        //var pvect;
         var mesh;
         var plot = new THREE.Object3D();
         var geometries = [];
         var normals = [];
         var timeNanos = [];
-        var tempX = [];
+        var time1000 = [];
+        var timeMillis = [];
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
@@ -172,21 +171,18 @@ Plot.prototype.drawGraph3 = function () {
                 points = new THREE.Geometry();
                 data = this.drawingCache[uuid].cached_data;
                 i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
-                x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
-                x = 1000000 * x[0] + x[1];
-                vertexVect = new THREE.Vector3(x, data[i][3], 0);
+                vertexVect = new THREE.Vector3(Math.floor(data[i][0] / 1000000), data[i][3], data[i][0] % 1000000);
                 graph.vertices.push(vertexVect);
                 graph.vertices.push(vertexVect.clone());
                 graph.vertices.push(vertexVect.clone());
                 graph.vertices.push(vertexVect.clone());
-                timeNanos.push(data[i][1]);
-                timeNanos.push(data[i][1]);
-                timeNanos.push(data[i][1]);
-                timeNanos.push(data[i][1]);
-                tempX.push(x);
-                tempX.push(x);
-                tempX.push(x);
-                tempX.push(x);
+                t1000 = Math.floor(data[i][0] / 1000000);
+                tMillis = Math.floor(data[i][0] % 1000000);
+                for (var j = 0; j < 4; j++) {
+                    time1000.push(t1000);
+                    timeMillis.push(tMillis);
+                    timeNanos.push(data[i][1]);
+                }
                 vertexID = 4;
                 normals.push(new THREE.Vector3(0, 0, 1));
                 normals.push(new THREE.Vector3(0, 0, 1));
@@ -198,21 +194,19 @@ Plot.prototype.drawGraph3 = function () {
                 pointID = 6;*/
                 i += 1;
                 do {
-                    x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
-                    x = 1000000 * x[0] + x[1]
-                    vertexVect = new THREE.Vector3(x, data[i][3], 0);
+                    vertexVect = new THREE.Vector3(0, data[i][3], 0);
                     graph.vertices.push(vertexVect);
                     graph.vertices.push(vertexVect.clone());
                     graph.vertices.push(vertexVect.clone());
                     graph.vertices.push(vertexVect.clone());
-                    timeNanos.push(data[i][1]);
-                    timeNanos.push(data[i][1]);
-                    timeNanos.push(data[i][1]);
-                    timeNanos.push(data[i][1]);
-                    tempX.push(x);
-                    tempX.push(x);
-                    tempX.push(x);
-                    tempX.push(x);
+                    t1000 = Math.floor(data[i][0] / 1000000);
+                    tMillis = Math.floor(data[i][0] % 1000000);
+                    for (var j = 0; j < 4; j++) {
+                        time1000.push(t1000);
+                        timeMillis.push(tMillis);
+                        timeNanos.push(data[i][1]);
+                    }
+                    
                     vertexID += 4;
                     
                     /*for (j = 0; j < 6; j++) {
@@ -254,29 +248,37 @@ Plot.prototype.drawGraph3 = function () {
                 graph.elementsNeedUpdate = true;
                 normals.push(new THREE.Vector3(0, 0, 1));
                 normals.push(new THREE.Vector3(0, 0, 1));
-                
                 var lineDrawer = new THREE.ShaderMaterial({
                         uniforms: {
                             "affineMatrix": {type: 'm4', value: affineMatrix},
                             "rot90Matrix": {type: 'm3', value: this.rotator90},
                             "thickness": {type: 'f', value: THICKNESS},
-                            "yDomainLo": {type: 'f', value: this.yAxis.domainLo}
+                            "yDomainLo": {type: 'f', value: this.yAxis.domainLo},
+                            "xDomainLo1000": {type: 'f', value: Math.floor(this.xAxis.domainLo[0] / 1000000)},
+                            "xDomainLoMillis": {type: 'f', value: this.xAxis.domainLo[0] % 1000000},
+                            "xDomainLoNanos": {type: 'f', value: this.xAxis.domainLo[1]}
                             },
                         attributes: {
                             "normalVector": {type: 'v3', value: normals},
-                            "timeNanos": {type: 'f', value: timeNanos},
-                            "tempX" : {type: 'f', value: tempX}
+                            "time1000": {type: 'f', value: time1000},
+                            "timeMillis": {type: 'f', value: timeMillis},
+                            "timeNanos": {type: 'f', value: timeNanos}
                             },
                         vertexShader: " \
                             uniform mat4 affineMatrix; \
                             uniform mat3 rot90Matrix; \
                             uniform float thickness; \
                             uniform float yDomainLo; \
+                            uniform float xDomainLo1000; \
+                            uniform float xDomainLoMillis; \
+                            uniform float xDomainLoNanos; \
                             attribute vec3 normalVector; \
+                            attribute float time1000; \
+                            attribute float timeMillis; \
                             attribute float timeNanos; \
-                            attribute float tempX; \
                             void main() { \
-                                vec3 truePosition = vec3(tempX, position.y - yDomainLo, position.z); \
+                                float xDiff = 1000000000000.0 * (time1000 - xDomainLo1000) + 1000000.0 * (timeMillis - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
+                                vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
                                 vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
                                 gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                              } \

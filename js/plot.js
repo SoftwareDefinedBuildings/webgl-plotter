@@ -154,12 +154,15 @@ Plot.prototype.drawGraph3 = function () {
         var pointID;
         var normal;
         var graph;
+        var tempTime;
         //var points;
         //var pvect;
         var mesh;
         var plot = new THREE.Object3D();
         var geometries = [];
         var normals = [];
+        var timeNanos = [];
+        var tempX = [];
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
@@ -170,11 +173,20 @@ Plot.prototype.drawGraph3 = function () {
                 data = this.drawingCache[uuid].cached_data;
                 i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
                 x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
-                vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3], 0);
+                x = 1000000 * x[0] + x[1];
+                vertexVect = new THREE.Vector3(x, data[i][3], 0);
                 graph.vertices.push(vertexVect);
                 graph.vertices.push(vertexVect.clone());
                 graph.vertices.push(vertexVect.clone());
                 graph.vertices.push(vertexVect.clone());
+                timeNanos.push(data[i][1]);
+                timeNanos.push(data[i][1]);
+                timeNanos.push(data[i][1]);
+                timeNanos.push(data[i][1]);
+                tempX.push(x);
+                tempX.push(x);
+                tempX.push(x);
+                tempX.push(x);
                 vertexID = 4;
                 normals.push(new THREE.Vector3(0, 0, 1));
                 normals.push(new THREE.Vector3(0, 0, 1));
@@ -184,14 +196,23 @@ Plot.prototype.drawGraph3 = function () {
                     points.vertices.push(pvect);
                 }
                 pointID = 6;*/
+                i += 1;
                 do {
                     x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
-                    vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3], 0);
+                    x = 1000000 * x[0] + x[1]
+                    vertexVect = new THREE.Vector3(x, data[i][3], 0);
                     graph.vertices.push(vertexVect);
                     graph.vertices.push(vertexVect.clone());
                     graph.vertices.push(vertexVect.clone());
                     graph.vertices.push(vertexVect.clone());
-                    
+                    timeNanos.push(data[i][1]);
+                    timeNanos.push(data[i][1]);
+                    timeNanos.push(data[i][1]);
+                    timeNanos.push(data[i][1]);
+                    tempX.push(x);
+                    tempX.push(x);
+                    tempX.push(x);
+                    tempX.push(x);
                     vertexID += 4;
                     
                     /*for (j = 0; j < 6; j++) {
@@ -202,8 +223,9 @@ Plot.prototype.drawGraph3 = function () {
                     
                     pointID += 6;*/
                     
-                    normal = new THREE.Vector3();
-                    normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
+                    tempTime = subTimes(data[i].slice(0, 2), data[i - 1]);
+                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[i][3] - data[i - 1][3], 0);
+                    //normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
                     /*normal.x *= affineMatrix.elements[0];
                     normal.y *= affineMatrix.elements[5];
                     normal.applyMatrix3(this.rotator90);
@@ -241,7 +263,9 @@ Plot.prototype.drawGraph3 = function () {
                             "yDomainLo": {type: 'f', value: this.yAxis.domainLo}
                             },
                         attributes: {
-                            "normalVector": {type: 'v3', value: normals}
+                            "normalVector": {type: 'v3', value: normals},
+                            "timeNanos": {type: 'f', value: timeNanos},
+                            "tempX" : {type: 'f', value: tempX}
                             },
                         vertexShader: " \
                             uniform mat4 affineMatrix; \
@@ -249,8 +273,10 @@ Plot.prototype.drawGraph3 = function () {
                             uniform float thickness; \
                             uniform float yDomainLo; \
                             attribute vec3 normalVector; \
+                            attribute float timeNanos; \
+                            attribute float tempX; \
                             void main() { \
-                                vec3 truePosition = vec3(position.x, position.y - yDomainLo, position.z); \
+                                vec3 truePosition = vec3(tempX, position.y - yDomainLo, position.z); \
                                 vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
                                 gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                              } \

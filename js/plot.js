@@ -170,8 +170,7 @@ Plot.prototype.drawGraph3 = function () {
                 data = this.drawingCache[uuid].cached_data;
                 i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
                 x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
-                y = this.yAxis.map(data[i][3]);
-                vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3] - this.yAxis.domainLo, 0);
+                vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3], 0);
                 graph.vertices.push(vertexVect);
                 graph.vertices.push(vertexVect.clone());
                 graph.vertices.push(vertexVect.clone());
@@ -187,8 +186,7 @@ Plot.prototype.drawGraph3 = function () {
                 pointID = 6;*/
                 do {
                     x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
-                    y = this.yAxis.map(data[i][3]);
-                    vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3] - this.yAxis.domainLo, 0);
+                    vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3], 0);
                     graph.vertices.push(vertexVect);
                     graph.vertices.push(vertexVect.clone());
                     graph.vertices.push(vertexVect.clone());
@@ -239,16 +237,21 @@ Plot.prototype.drawGraph3 = function () {
                         uniforms: {
                             "affineMatrix": {type: 'm4', value: affineMatrix},
                             "rot90Matrix": {type: 'm3', value: this.rotator90},
-                            "thickness": {type: 'f', value: THICKNESS}
+                            "thickness": {type: 'f', value: THICKNESS},
+                            "yDomainLo": {type: 'f', value: this.yAxis.domainLo}
                             },
-                        attributes: { "normalVector": {type: 'v3', value: normals} },
-                        vertexShader: "\
+                        attributes: {
+                            "normalVector": {type: 'v3', value: normals}
+                            },
+                        vertexShader: " \
                             uniform mat4 affineMatrix; \
                             uniform mat3 rot90Matrix; \
                             uniform float thickness; \
+                            uniform float yDomainLo; \
                             attribute vec3 normalVector; \
                             void main() { \
-                                vec4 newPosition = affineMatrix * vec4(position, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
+                                vec3 truePosition = vec3(position.x, position.y - yDomainLo, position.z); \
+                                vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
                                 gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                              } \
                              ",

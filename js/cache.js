@@ -37,6 +37,7 @@ function CacheEntry(startTime, endTime, data) {
     this.start_time = startTime;
     this.end_time = endTime;
     this.cached_data = data;
+    this.cached_drawing = {};
 }
 
 /* Ensures that CACHE, an array of cache entries, is not corrupted. Included

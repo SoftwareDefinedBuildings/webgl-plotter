@@ -157,68 +157,77 @@ Plot.prototype.drawGraph3 = function () {
         var tempTime;
         var mesh;
         var plot = new THREE.Object3D();
-        var geometries = [];
         var normals = [];
         var timeNanos = [];
-        var startIndex;
+        var cacheEntry;
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
-                graph = new THREE.Geometry();
-                points = new THREE.Geometry();
-                data = this.drawingCache[uuid].cached_data;
-                startIndex = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
-                vertexID = 0;
-                for (i = startIndex; i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0; i++) {
-                    // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
-                    vertexVect = new THREE.Vector3(Math.floor(data[i][0] / 1000000), data[i][3], data[i][0] % 1000000);
+                cacheEntry = this.drawingCache[uuid];
+                if (cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                    graph = cacheEntry.cached_drawing.graph;
+                    normals = cacheEntry.cached_drawing.normals;
+                    timeNanos = cacheEntry.cached_drawing.graph;
+                } else {
+                    graph = new THREE.Geometry();
+                    data = cacheEntry.cached_data;
+                    vertexID = 0;
+                    for (i = 0; i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0; i++) {
+                        // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
+                        vertexVect = new THREE.Vector3(Math.floor(data[i][0] / 1000000), data[i][3], data[i][0] % 1000000);
 
-                    for (var j = 0; j < 4; j++) {
-                        // These are reference copies, but that's OK since it gets sent to the vertex shader
-                        graph.vertices.push(vertexVect);
-                        timeNanos.push(data[i][1]);
-                    }
-                    
-                    vertexID += 4;
-                    
-                    /*for (j = 0; j < 6; j++) {
-                        pvect = new THREE.Vector3(x, y, 0);
-                        pvect.add(transforms[j]);
-                        points.vertices.push(pvect);
-                    }
-                    
-                    pointID += 6;*/
-                    
-                    if (i == startIndex) {
-                        normals.push(new THREE.Vector3(0, 0, 1));
-                        normals.push(new THREE.Vector3(0, 0, 1));
-                    } else {
-                        tempTime = subTimes(data[i].slice(0, 2), data[i - 1]);
-                        normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[i][3] - data[i - 1][3], 0);
-                        // Again, reference copies are OK because it gets sent to the vertex shader
-                        normals.push(normal);
-                        normals.push(normal.clone());
-                        normals.push(normal);
-                        normals.push(normals[vertexID - 5]);
-                        normals[vertexID - 5].negate();
+                        for (var j = 0; j < 4; j++) {
+                            // These are reference copies, but that's OK since it gets sent to the vertex shader
+                            graph.vertices.push(vertexVect);
+                            timeNanos.push(data[i][1]);
+                        }
+                        
+                        vertexID += 4;
+                        
+                        /*for (j = 0; j < 6; j++) {
+                            pvect = new THREE.Vector3(x, y, 0);
+                            pvect.add(transforms[j]);
+                            points.vertices.push(pvect);
+                        }
+                        
+                        pointID += 6;*/
+                        
+                        if (i == 0) {
+                            normals.push(new THREE.Vector3(0, 0, 1));
+                            normals.push(new THREE.Vector3(0, 0, 1));
+                        } else {
+                            tempTime = subTimes(data[i].slice(0, 2), data[i - 1]);
+                            normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[i][3] - data[i - 1][3], 0);
+                            // Again, reference copies are OK because it gets sent to the vertex shader
+                            normals.push(normal);
+                            normals.push(normal.clone());
+                            normals.push(normal);
+                            normals.push(normals[vertexID - 5]);
+                            normals[vertexID - 5].negate();
 
-                        
-                        // It seems that faces only show up if you traverse their vertices counterclockwise
-                        graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-                        graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-                        
-                        /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
-                        points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
-                        points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-                        points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+                            
+                            // It seems that faces only show up if you traverse their vertices counterclockwise
+                            graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                            graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                            
+                            /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
+                            points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
+                            points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
+                            points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+                        }
                     }
+                    graph.verticesNeedUpdate = true;
+                    graph.elementsNeedUpdate = true;
+                    normals.push(new THREE.Vector3(0, 0, 1));
+                    normals.push(new THREE.Vector3(0, 0, 1));
+                    
+                    cacheEntry.cached_drawing.graph = graph;
+                    cacheEntry.cached_drawing.normals = normals;
+                    cacheEntry.cached_drawing.timeNanos = timeNanos;
                 }
-                graph.verticesNeedUpdate = true;
-                graph.elementsNeedUpdate = true;
-                normals.push(new THREE.Vector3(0, 0, 1));
-                normals.push(new THREE.Vector3(0, 0, 1));
+                
                 var lineDrawer = new THREE.ShaderMaterial({
                         uniforms: {
                             "affineMatrix": {type: 'm4', value: affineMatrix},
@@ -242,8 +251,6 @@ Plot.prototype.drawGraph3 = function () {
                             uniform float xDomainLoMillis; \
                             uniform float xDomainLoNanos; \
                             attribute vec3 normalVector; \
-                            attribute float time1000; \
-                            attribute float timeMillis; \
                             attribute float timeNanos; \
                             void main() { \
                                 float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
@@ -260,23 +267,19 @@ Plot.prototype.drawGraph3 = function () {
                     });
                 
                 mesh = new THREE.Mesh(graph, lineDrawer);
+                
                 // The stream must always be drawn. I can't just check if it's in view since the
                 // vertices change drastically due to vertex shading.
                 mesh.frustumCulled = false;
+                
                 plot.add(mesh);
                 /*mesh = new THREE.Mesh(points, new THREE.MeshBasicMaterial({color: 0x0000ff}));
                 plot.add(mesh);*/
-                geometries.push(graph);
-                //geometries.push(points);
             }
         }
         if (this.plot != undefined) {
             this.plotter.scene.remove(this.plot);
         }
-        for (i = 0; i < this.geometries.length; i++) {
-            this.geometries[i].dispose();
-        }
-        this.geometries = geometries;
         this.plot = plot;
         this.plotter.scene.add(plot);
     };

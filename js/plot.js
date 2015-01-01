@@ -151,13 +151,14 @@ Plot.prototype.drawGraph3 = function () {
         var x;
         var vertexID;
         var pointID;
-        var normal = new THREE.Vector3();
+        var normal;
         var graph;
-        var points;
-        var pvect;
+        //var points;
+        //var pvect;
         var mesh;
         var plot = new THREE.Object3D();
         var geometries = [];
+        var normals = [];
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 graph = new THREE.Geometry();
@@ -171,12 +172,14 @@ Plot.prototype.drawGraph3 = function () {
                 graph.vertices.push(new THREE.Vector3(x, y, 0));
                 graph.vertices.push(new THREE.Vector3(x, y, 0));
                 vertexID = 4;
-                for (j = 0; j < 6; j++) {
+                normals.push(new THREE.Vector3());
+                normals.push(new THREE.Vector3());
+                /*for (j = 0; j < 6; j++) {
                     pvect = new THREE.Vector3(x, y, 0);
                     pvect.add(transforms[j]);
                     points.vertices.push(pvect);
                 }
-                pointID = 6;
+                pointID = 6;*/
                 do {
                     x = this.xAxis.map(data[i]);
                     y = this.yAxis.map(data[i][3]);
@@ -188,43 +191,65 @@ Plot.prototype.drawGraph3 = function () {
                     
                     vertexID += 4;
                     
-                    for (j = 0; j < 6; j++) {
+                    /*for (j = 0; j < 6; j++) {
                         pvect = new THREE.Vector3(x, y, 0);
                         pvect.add(transforms[j]);
                         points.vertices.push(pvect);
                     }
                     
-                    pointID += 6;
+                    pointID += 6;*/
                     
+                    normal = new THREE.Vector3();
                     normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
                     normal.applyMatrix3(this.rotator90);
                     normal.normalize();
                     normal.multiplyScalar(THICKNESS);
-                    
-                    graph.vertices[vertexID - 6].add(normal);
-                    graph.vertices[vertexID - 5].sub(normal);
-                    graph.vertices[vertexID - 4].add(normal);
-                    graph.vertices[vertexID - 3].sub(normal);
+                    normals.push(normal);
+                    normals.push(normal.clone());
+                    normals.push(normal.clone());
+                    normals.push(normal.clone());
+                    normals[vertexID - 3].negate();
+                    normals[vertexID - 5].negate();
+
                     
                     // It seems that faces only show up if you traverse their vertices counterclockwise
                     graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
                     graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
                     
-                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
+                    /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
                     points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
                     points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
                     
                     i++;
                 } while (i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0);
                 graph.verticesNeedUpdate = true;
                 graph.elementsNeedUpdate = true;
-                mesh = new THREE.Mesh(graph, new THREE.MeshBasicMaterial({color: 0x0000ff}));
+                normals.push(new THREE.Vector3());
+                normals.push(new THREE.Vector3());
+                
+                var lineDrawer = new THREE.ShaderMaterial({
+                        attributes: { "normalVector": {type: 'v3', value: normals} },
+                        vertexShader: "\
+                            attribute vec3 normalVector; \
+                            void main() { \
+                                vec4 newPosition = vec4(position, 1.0) + vec4(normalVector, 0.0); \
+                                gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
+                             } \
+                             ",
+                        fragmentShader: "\
+                             void main() { \
+                                 gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
+                             } \
+                             "
+                    });
+                
+                mesh = new THREE.Mesh(graph, lineDrawer);//new THREE.MeshBasicMaterial({color: 0x0000ff}));
                 plot.add(mesh);
-                mesh = new THREE.Mesh(points, new THREE.MeshBasicMaterial({color: 0x0000ff}));
-                plot.add(mesh);
+                /*mesh = new THREE.Mesh(points, new THREE.MeshBasicMaterial({color: 0x0000ff}));
+                plot.add(mesh);*/
                 geometries.push(graph);
-                geometries.push(points);
+                //geometries.push(points);
             }
         }
         if (this.plot != undefined) {

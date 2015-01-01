@@ -35,3 +35,22 @@ TimeAxis.prototype.unmap = function (y) {
         subTimes(hi, this.domainLo);
         return addTime(mulTime(hi, (y - this.rangeLo) / (this.rangeHi - this.rangeLo)), this.domainLo);
     };
+    
+/** Given a TimeAxis the operates on x-coordinates and an Axis that operates on
+    y-coordinates, returns a 4 x 4 matrix that performs the Affine Transform.
+    Due to the fact that nanosecond timestamps cannot be represented exactly as
+    Numbers in Javascript, and due to the nature of Affine Transforms, the
+    vector that gets transformed is not the <x, y, z> point, but is instead
+    <x - timeaxis.domainLo, y - axis.domainLo, z>. The idea is that any
+    precision lost by representing x - timeaxis.domainLo as a float will
+    produce a negligible effect in the graph. */
+function getAffineTransformMatrix(timeaxis, axis) {
+    var timeDomainDiff = subTimes(timeaxis.domainHi.slice(0), timeaxis.domainLo);
+    var transform = new THREE.Matrix4();
+    transform.set((timeaxis.rangeHi - timeaxis.rangeLo) / (1000000 * timeDomainDiff[0] + timeDomainDiff[1]), 0, 0, timeaxis.rangeLo,
+        0, (axis.rangeHi - axis.rangeLo) / (axis.domainHi - axis.domainLo), 0, axis.rangeLo,
+        0, 0, 1, 0,
+        0, 0, 0, 1);
+    
+    return transform;
+}

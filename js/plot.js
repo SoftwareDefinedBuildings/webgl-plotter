@@ -149,6 +149,7 @@ Plot.prototype.drawGraph3 = function () {
         // For now, just draw the visible region.
         var data;
         var x;
+        var vertexVect;
         var vertexID;
         var pointID;
         var normal;
@@ -159,21 +160,25 @@ Plot.prototype.drawGraph3 = function () {
         var plot = new THREE.Object3D();
         var geometries = [];
         var normals = [];
+        
+        var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
+        
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 graph = new THREE.Geometry();
                 points = new THREE.Geometry();
                 data = this.drawingCache[uuid].cached_data;
                 i = binSearchCmp(data, this.xAxis.domainLo, cmpTimes);
-                x = this.xAxis.map(data[i]);
-                y = this.yAxis.map(data[i++][3]);
-                graph.vertices.push(new THREE.Vector3(x, y, 0));
-                graph.vertices.push(new THREE.Vector3(x, y, 0));
-                graph.vertices.push(new THREE.Vector3(x, y, 0));
-                graph.vertices.push(new THREE.Vector3(x, y, 0));
+                x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
+                y = this.yAxis.map(data[i][3]);
+                vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3] - this.yAxis.domainLo, 0);
+                graph.vertices.push(vertexVect);
+                graph.vertices.push(vertexVect.clone());
+                graph.vertices.push(vertexVect.clone());
+                graph.vertices.push(vertexVect.clone());
                 vertexID = 4;
-                normals.push(new THREE.Vector3());
-                normals.push(new THREE.Vector3());
+                normals.push(new THREE.Vector3(0, 0, 1));
+                normals.push(new THREE.Vector3(0, 0, 1));
                 /*for (j = 0; j < 6; j++) {
                     pvect = new THREE.Vector3(x, y, 0);
                     pvect.add(transforms[j]);
@@ -181,13 +186,13 @@ Plot.prototype.drawGraph3 = function () {
                 }
                 pointID = 6;*/
                 do {
-                    x = this.xAxis.map(data[i]);
+                    x = subTimes(data[i].slice(0, 2), this.xAxis.domainLo);
                     y = this.yAxis.map(data[i][3]);
-                    
-                    graph.vertices.push(new THREE.Vector3(x, y, 0));
-                    graph.vertices.push(new THREE.Vector3(x, y, 0));
-                    graph.vertices.push(new THREE.Vector3(x, y, 0));
-                    graph.vertices.push(new THREE.Vector3(x, y, 0));
+                    vertexVect = new THREE.Vector3(1000000 * x[0] + x[1], data[i][3] - this.yAxis.domainLo, 0);
+                    graph.vertices.push(vertexVect);
+                    graph.vertices.push(vertexVect.clone());
+                    graph.vertices.push(vertexVect.clone());
+                    graph.vertices.push(vertexVect.clone());
                     
                     vertexID += 4;
                     
@@ -201,9 +206,11 @@ Plot.prototype.drawGraph3 = function () {
                     
                     normal = new THREE.Vector3();
                     normal.subVectors(graph.vertices[vertexID - 4], graph.vertices[vertexID - 5]);
+                    /*normal.x *= affineMatrix.elements[0];
+                    normal.y *= affineMatrix.elements[5];
                     normal.applyMatrix3(this.rotator90);
                     normal.normalize();
-                    normal.multiplyScalar(THICKNESS);
+                    normal.multiplyScalar(THICKNESS);*/
                     normals.push(normal);
                     normals.push(normal.clone());
                     normals.push(normal.clone());
@@ -225,15 +232,23 @@ Plot.prototype.drawGraph3 = function () {
                 } while (i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0);
                 graph.verticesNeedUpdate = true;
                 graph.elementsNeedUpdate = true;
-                normals.push(new THREE.Vector3());
-                normals.push(new THREE.Vector3());
+                normals.push(new THREE.Vector3(0, 0, 1));
+                normals.push(new THREE.Vector3(0, 0, 1));
                 
                 var lineDrawer = new THREE.ShaderMaterial({
+                        uniforms: {
+                            "affineMatrix": {type: 'm4', value: affineMatrix},
+                            "rot90Matrix": {type: 'm3', value: this.rotator90},
+                            "thickness": {type: 'f', value: THICKNESS}
+                            },
                         attributes: { "normalVector": {type: 'v3', value: normals} },
                         vertexShader: "\
+                            uniform mat4 affineMatrix; \
+                            uniform mat3 rot90Matrix; \
+                            uniform float thickness; \
                             attribute vec3 normalVector; \
                             void main() { \
-                                vec4 newPosition = vec4(position, 1.0) + vec4(normalVector, 0.0); \
+                                vec4 newPosition = affineMatrix * vec4(position, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
                                 gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                              } \
                              ",

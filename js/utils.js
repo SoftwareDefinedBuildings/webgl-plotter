@@ -113,6 +113,15 @@ function boundToRange(time, low, high) {
     return time;
 }
 
+function roundTime(time) {
+    time[1] = Math.round(time[1]);
+    if (time[1] == 1000000) {
+        time[0]++;
+        time[1] = 0;
+    }
+    return time;
+}
+
 /* Modifying the output of this function could seriously mess things up. */
 function expToPW(pwe) {
     // I guess I could use repeated squaring to do this efficiently

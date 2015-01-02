@@ -118,7 +118,12 @@ function validateContiguous(cacheEntry, pwe) {
    containing the data as its argument. If another call to this function i
    pending (it has requested data from the server) for a certain stream, any
    more calls for that stream will not result in a GET request (so this
-   function doesn't fall behind user input). */
+   function doesn't fall behind user input).
+   
+   STARTTIME and ENDTIME are aliased in the cache, so pass in a copy. If you
+   don't, editing those same variables later could make the cache invalid.
+   
+   */
 Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
         var halfPW = expToPW(pointwidthexp - 1);
@@ -150,7 +155,6 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
             cache = [];
             dataCache[uuid][pointwidthexp] = cache;
         }
-        
         var indices = getIndices(cache, startTime, endTime);
         var i = indices[0];
         var j = indices[1];
@@ -159,7 +163,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
         var queryStart = startsBefore ? startTime : cache[i].end_time;
         var queryEnd = endsAfter ? endTime : cache[j].start_time;
         
-        var numRequests = j - i + startsBefore + endsAfter;    
+        var numRequests = j - i + startsBefore + endsAfter; 
         if (numRequests == 0) {
             callback(cache[i]);
         } else {
@@ -387,7 +391,7 @@ function getIndices(cache, startTime, endTime) {
     var i, j;
     if (cache.length > 0) {
         // Try to find the cache entry with data, or determine if there is no such entry
-        i = binSearchCmp(cache, startTime, cmpTimes);
+        i = binSearchCmp(cache, {start_time: startTime}, cmpEntryStarts);
         if (cmpTimes(startTime, cache[i].start_time) < 0) {
             i--;
         } // Now, startTime is either in entry at index i, or between index i and i + 1, or at the very beginning
@@ -404,8 +408,8 @@ function getIndices(cache, startTime, endTime) {
             i++; // so we don't delete the entry at index i
         }
         
-        j = binSearchCmp(cache, endTime, cmpTimes); // endTime is either in entry at index j, or between j - 1 and j, or between j and j + 1
-        if (cmpTimes(endTime, cache[j].end_time)) {
+        j = binSearchCmp(cache, {end_time: endTime}, cmpEntryEnds); // endTime is either in entry at index j, or between j - 1 and j, or between j and j + 1
+        if (cmpTimes(endTime, cache[j].end_time) > 0) {
             j++;
         } // Now, endTime is either in entry at index j, or between index j - 1 and j, or at the very end
         if (j == cache.length) {
@@ -429,6 +433,14 @@ function getIndices(cache, startTime, endTime) {
         j = -1;
     }
     return [i, j, startsBefore, endsAfter];
+}
+
+function cmpEntryStarts(entry1, entry2) {
+    return cmpTimes(entry1.start_time, entry2.start_time);
+}
+
+function cmpEntryEnds(entry1, entry2) {
+    return cmpTimes(entry1.end_time, entry2.end_time);
 }
 
 /* Excise the portion of the cache for the stream with UUID where the time is

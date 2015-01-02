@@ -33,7 +33,7 @@ TimeAxis.prototype.unmap = function (y) {
         var hi = this.domainHi.slice(0);
         
         subTimes(hi, this.domainLo);
-        return addTime(mulTime(hi, (y - this.rangeLo) / (this.rangeHi - this.rangeLo)), this.domainLo);
+        return addTimes(mulTime(hi, (y - this.rangeLo) / (this.rangeHi - this.rangeLo)), this.domainLo);
     };
     
 /** Given a TimeAxis the operates on x-coordinates and an Axis that operates on

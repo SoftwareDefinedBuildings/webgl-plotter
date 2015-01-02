@@ -8,7 +8,7 @@
     change dynamically. The resizeToMargins method resizes the plot space
     according to the inner margins. */
 
-function Plot (plotter, outermargin, hToW, x, y) { // implements Clickable
+function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable
     this.plotter = plotter;
     this.outermargin = outermargin;
     this.hToW = hToW;
@@ -27,6 +27,8 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Clickable
     var plotbg = new THREE.Mesh(this.plotbgGeom, new THREE.MeshBasicMaterial({color: 0x00ff00}));
     plotter.scene.add(plotbg);
     
+    this.PLOTBG_VIRTUAL_WIDTH = plotter.VIRTUAL_WIDTH - 2 * outermargin;
+    
     this.innermarginOffsets = [new THREE.Vector3(this.innermargin.left, this.innermargin.bottom, 0),
         new THREE.Vector3(-this.innermargin.right, this.innermargin.bottom, 0),
         new THREE.Vector3(-this.innermargin.right, -this.innermargin.top, 0),
@@ -43,7 +45,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Clickable
     
     // detect clicks in the plot space
     plotsp.wrapper = this;
-    plotter.clickables.push(plotsp);
+    plotter.draggables.push(plotsp);
     
     // create the first level of cache
     this.drawingCache = {};
@@ -64,6 +66,8 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Clickable
 /** Just draw the same data again with the new x-axis. In other words, we just
     read the first level of cache and draw that same data on the new axis. */
 Plot.prototype.quickUpdate = function () {
+        // Normally, I'd update the x-axis ticks here. But I'll implement that later
+        this.drawGraph3();
     };
     
 /** Draw the graph with the new x-axis, accounting for the fact that the data
@@ -75,11 +79,9 @@ Plot.prototype.fullUpdate = function (callback) {
         var nanoDiff = this.endTime.slice(0);
         subTimes(nanoDiff, this.startTime);
         
-        var leftVect = this.plotspGeom.vertices[0].clone().project(this.plotter.camera);
-        var rightVect = this.plotspGeom.vertices[1].clone().project(this.plotter.camera);
-        var numPixels = rightVect.sub(leftVect).length() * this.plotter.width;
+        this.recomputePixelsWideIfNecessary();
         
-        this.pwe = getPWExponent(mulTime(nanoDiff, 1 / numPixels));
+        this.pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWide));
         
         var numstreams = this.plotter.selectedStreams.length;
         var numreplies = 0;
@@ -89,11 +91,13 @@ Plot.prototype.fullUpdate = function (callback) {
         var currUUID;
         for (var i = 0; i < numstreams; i++) {
             currUUID = this.plotter.selectedStreams[i].uuid;
-            this.dataCache.getData(currUUID, this.pwe, this.xAxis.domainLo, this.xAxis.domainHi, (function (uuid) {
+            this.dataCache.getData(currUUID, this.pwe, roundTime(this.xAxis.domainLo.slice(0, 2)), roundTime(this.xAxis.domainHi.slice(0, 2)), (function (uuid) {
                     return function (entry) {
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
                             if (numreplies == numstreams) {
+                                //console.log(self.drawingCache);
+                                //console.log(newDrawingCache);
                                 self.drawingCache = newDrawingCache; // replace the first layer of the cache
                                 callback();
                             }
@@ -141,7 +145,7 @@ Plot.prototype.drawGraph2 = function () {
     
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
-        var THICKNESS = 0.2;
+        var THICKNESS = 0.1;
         /*var transforms = [];
         var i, j;
         transforms.push(new THREE.Vector3(THICKNESS, 0, 0));
@@ -210,9 +214,53 @@ Plot.prototype.resizeToMargins = function () {
         for (var i = 0; i < 4; i++) {
             this.plotspGeom.vertices[i].addVectors(this.plotbgGeom.vertices[i], this.innermarginOffsets[i]);
         }
+        
+        this.plotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.innermargin.left - this.innermargin.right;
+        
+        this.pixelsWideChanged();
+        
         this.plotspGeom.verticesNeedUpdate = true;
     };
     
-Plot.prototype.click = function () {
-        console.log("clicked");
+Plot.prototype.pixelsWideChanged = function () {
+        this.pixelsWide = NaN;
+    };
+    
+Plot.prototype.recomputePixelsWideIfNecessary = function () {
+        if (isNaN(this.pixelsWide)) {
+            var leftVect = this.plotspGeom.vertices[0].clone().project(this.plotter.camera);
+            var rightVect = this.plotspGeom.vertices[1].clone().project(this.plotter.camera);
+            this.pixelsWide = rightVect.sub(leftVect).length() * this.plotter.width / 2;
+        }
+    };
+    
+Plot.prototype.startDrag = function () {
+        this.scrolling = true;
+    };
+    
+Plot.prototype.stopDrag = function () {
+        this.scrolling = false;
+        var self = this;
+        this.fullUpdate(function () {
+                self.drawGraph3();
+            });
+    };
+    
+Plot.prototype.drag = function (deltaX, deltaY) {
+        if (this.scrolling) {
+            // Update the axis
+            var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
+            this.recomputePixelsWideIfNecessary();
+            
+            this.xAxis.domainHi
+            
+            
+            var xStart = trueDelta + this.xAxis.rangeLo;
+            var deltaTime = subTimes(this.xAxis.unmap(xStart), this.xAxis.domainLo);
+            subTimes(this.xAxis.domainLo, deltaTime);
+            subTimes(this.xAxis.domainHi, deltaTime);
+            
+            // Update the screen
+            this.quickUpdate();
+        }
     };

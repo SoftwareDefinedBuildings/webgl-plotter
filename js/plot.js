@@ -160,6 +160,7 @@ Plot.prototype.drawGraph3 = function () {
         var normals = [];
         var timeNanos = [];
         var cacheEntry;
+        var shader;
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
@@ -170,6 +171,14 @@ Plot.prototype.drawGraph3 = function () {
                     graph = cacheEntry.cached_drawing.graph;
                     normals = cacheEntry.cached_drawing.normals;
                     timeNanos = cacheEntry.cached_drawing.graph;
+                    shader = cacheEntry.cached_drawing.shader;
+                    shader.uniforms.affineMatrix.value = affineMatrix;
+                    shader.uniforms.rot90Matrix.value = this.rotator90;
+                    shader.uniforms.thickness.value = THICKNESS;
+                    shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
+                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
                 } else {
                     graph = new THREE.Geometry();
                     data = cacheEntry.cached_data;
@@ -226,9 +235,8 @@ Plot.prototype.drawGraph3 = function () {
                     cacheEntry.cached_drawing.graph = graph;
                     cacheEntry.cached_drawing.normals = normals;
                     cacheEntry.cached_drawing.timeNanos = timeNanos;
-                }
                 
-                var lineDrawer = new THREE.ShaderMaterial({
+                    shader = new THREE.ShaderMaterial({
                         uniforms: {
                             "affineMatrix": {type: 'm4', value: affineMatrix},
                             "rot90Matrix": {type: 'm3', value: this.rotator90},
@@ -265,8 +273,11 @@ Plot.prototype.drawGraph3 = function () {
                              } \
                              "
                     });
+                    
+                    cacheEntry.cached_drawing.shader = shader;
+                }
                 
-                mesh = new THREE.Mesh(graph, lineDrawer);
+                mesh = new THREE.Mesh(graph, shader);
                 
                 // The stream must always be drawn. I can't just check if it's in view since the
                 // vertices change drastically due to vertex shading.

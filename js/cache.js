@@ -134,8 +134,8 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
         subTimes(starthigh, [0, 1]);
         subTimes(endhigh, halfPW);
         
-        startTime = boundToRange(startTime, startlow, starthigh);//Math.min(Math.max(startTime, this.queryLow + Math.ceil(halfPWmillis)), this.queryHigh - Math.ceil(halfPWmillis) - 1);
-        endTime = boundToRange(endTime, endlow, endhigh);//Math.min(Math.max(endTime, this.queryLow + Math.ceil(halfPWmillis) + 1), this.queryHigh - Math.ceil(halfPWmillis));
+        startTime = boundToRange(startTime, startlow, starthigh);
+        endTime = boundToRange(endTime, endlow, endhigh);
         var dataCache = this.dataCache;
         // Create the mapping for this stream if it isn't already present
         if (!dataCache.hasOwnProperty(uuid)) {
@@ -344,8 +344,15 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
         var cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, data.slice(m, n)), dataAfter));
         var loadedStreams = this.loadedStreams;
         for (var k = i; k <= j; k++) {
+            // Update the amount of data has been loaded into the cache
             this.loadedData -= cache[k].cached_data.length;
             loadedStreams[uuid] -= cache[k].cached_data.length;
+            
+            // Dispose of the geometries to avoid leaking memory
+            if (cache[k].cached_drawing.hasOwnProperty("graph")) {
+                cache[k].cached_drawing.graph.dispose();
+                delete cache[k].cached_drawing.graph;
+            }
         }
         this.loadedData += cacheEntry.cached_data.length;
         loadedStreams[uuid] += cacheEntry.cached_data.length;
@@ -473,6 +480,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         // Delete extra streams
         var uuid;
         var used;
+        var pointwidth;
         for (uuid in dataCache) {
             if (dataCache.hasOwnProperty(uuid)) {
                 used = false;
@@ -484,6 +492,16 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                 }
                 if (!used) {
                     this.loadedData -= this.loadedStreams[uuid];
+                    for (pointwidth in this.dataCache[uuid]) {
+                        if (this.dataCache[uuid].hasOwnProperty(pointwidth)) {
+                            for (i = 0; i < this.dataCache[uuid][pointwidth].length; i++) {
+                                if (this.dataCache[uuid][pointwidth][i].cached_drawing.hasOwnProperty("graph")) {
+                                    this.dataCache[uuid][pointwidth][i].cached_drawing.graph.dispose();
+                                    delete this.dataCache[uuid][pointwidth][i].cached_drawing.graph;
+                                }
+                            }
+                        }
+                    }
                     delete this.dataCache[uuid];
                     delete this.loadedStreams[uuid];
                     if (this.lastTimes.hasOwnProperty(uuid)) {
@@ -532,6 +550,10 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                     pwcount = 0;
                     for (k = pwdata.length - 1; k >= 0; k--) {
                         pwcount += pwdata[k].cached_data.length;
+                        if (pwdata[k].cached_drawing.hasOwnProperty("graph")) {
+                            pwdata[k].cached_drawing.graph.dispose();
+                            delete pwdata[k].cached_drawing.graph;
+                        }
                     }
                     delete dataCache[uuid][pointwidth];
                     this.loadedData -= pwcount;
@@ -552,6 +574,10 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                     continue; // This is the cache entry being displayed; we won't delete it
                 }
                 pwcount += pwdata[j].cached_data.length;
+                if (pwdata[j].cached_drawing.hasOwnProperty("graph")) {
+                    pwdata[j].cached_drawing.graph.dispose();
+                    delete pwdata[j].cached_drawing.graph;
+                }
                 pwdata.splice(j, 1);
             }
             this.loadedData -= pwcount;
@@ -573,6 +599,10 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
             }
             if (cmpTimes(pwdata[k], endTime) <= 0 && k < pwdata.length - 1) {
                 k++;
+            }
+            if (dataCache[streams[i].uuid][currPWE][0].cached_drawing.hasOwnProperty("graph")) {
+                dataCache[streams[i].uuid][currPWE][0].cached_drawing.graph.dispose();
+                delete dataCache[streams[i].uuid][currPWE][0].cached_drawing.graph;
             }
             dataCache[streams[i].uuid][currPWE][0] = new CacheEntry([pwdata[j][0], pwdata[j][1]], [pwdata[k][0], pwdata[k][1]], pwdata.slice(j, k));
             loadedStreams[streams[i].uuid] += (k - j);

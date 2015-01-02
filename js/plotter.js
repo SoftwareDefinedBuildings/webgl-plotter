@@ -6,6 +6,7 @@ function Plotter() {
     this.hToW = 1;
     this.clickables = [];
     this.draggables = [];
+    this.scrollables = [];
     
     this.VIRTUAL_WIDTH = 200; // The width of the plotter in virtual coordinates
     
@@ -45,7 +46,6 @@ function Plotter() {
             var ray = self.getMouseRay(event);
             var intersections = ray.intersectObjects(self.draggables);
             
-            var obj;
             if (intersections.length > 0) {
                 intersections[0].object.wrapper.startDrag();
             }
@@ -62,6 +62,16 @@ function Plotter() {
                 self.draggables[i].wrapper.drag(event.originalEvent.movementX, event.originalEvent.movementY);
             }
         });
+        
+    this.canvas.onmousewheel = function (event) {
+            var ray = self.getMouseRay(event);
+            var intersections = ray.intersectObjects(self.scrollables);
+            
+            if (intersections.length > 0) {
+                intersections[0].object.wrapper.scroll(event.wheelDelta);
+                return false;
+            }
+        };
     
     // all requests for external resources are done through the Requester
     this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');

@@ -8,7 +8,7 @@
     change dynamically. The resizeToMargins method resizes the plot space
     according to the inner margins. */
 
-function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable
+function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scrollable
     this.plotter = plotter;
     this.outermargin = outermargin;
     this.hToW = hToW;
@@ -46,6 +46,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable
     // detect clicks in the plot space
     plotsp.wrapper = this;
     plotter.draggables.push(plotsp);
+    plotter.scrollables.push(plotsp);
     
     // create the first level of cache
     this.drawingCache = {};
@@ -263,4 +264,17 @@ Plot.prototype.drag = function (deltaX, deltaY) {
             // Update the screen
             this.quickUpdate();
         }
+    };
+    
+Plot.prototype.scroll = function (amount) {
+        var currRange = subTimes(this.xAxis.domainHi.slice(0, 2), this.xAxis.domainLo);
+        mulTime(currRange, amount / 10000);
+        addTimes(this.xAxis.domainLo, currRange);
+        subTimes(this.xAxis.domainHi, currRange);
+        
+        var self = this;
+        // Update the screen
+        this.fullUpdate(function () {
+                self.drawGraph3();
+            });
     };

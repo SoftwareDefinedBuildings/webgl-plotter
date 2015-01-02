@@ -8,7 +8,7 @@
     change dynamically. The resizeToMargins method resizes the plot space
     according to the inner margins. */
 
-function Plot (plotter, outermargin, hToW, x, y) {
+function Plot (plotter, outermargin, hToW, x, y) { // implements Clickable
     this.plotter = plotter;
     this.outermargin = outermargin;
     this.hToW = hToW;
@@ -40,6 +40,10 @@ function Plot (plotter, outermargin, hToW, x, y) {
     this.plotspGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var plotsp = new THREE.Mesh(this.plotspGeom, new THREE.MeshBasicMaterial({color: 0xffffff}));
     plotter.scene.add(plotsp);
+    
+    // detect clicks in the plot space
+    plotsp.wrapper = this;
+    plotter.clickables.push(plotsp);
     
     // create the first level of cache
     this.drawingCache = {};
@@ -148,17 +152,9 @@ Plot.prototype.drawGraph3 = function () {
         
         // For now, just draw the visible region.
         var data;
-        var t1000, tMillis, tNanos;
-        var vertexVect;
-        var vertexID;
-        var pointID;
-        var normal;
         var graph;
-        var tempTime;
         var mesh;
         var plot = new THREE.Object3D();
-        var normals = [];
-        var timeNanos = [];
         var cacheEntry;
         var shader;
         
@@ -167,115 +163,20 @@ Plot.prototype.drawGraph3 = function () {
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 cacheEntry = this.drawingCache[uuid];
-                if (cacheEntry.cached_drawing.hasOwnProperty("graph")) {
-                    graph = cacheEntry.cached_drawing.graph;
-                    normals = cacheEntry.cached_drawing.normals;
-                    timeNanos = cacheEntry.cached_drawing.graph;
-                    shader = cacheEntry.cached_drawing.shader;
-                    shader.uniforms.affineMatrix.value = affineMatrix;
-                    shader.uniforms.rot90Matrix.value = this.rotator90;
-                    shader.uniforms.thickness.value = THICKNESS;
-                    shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
-                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                } else {
-                    graph = new THREE.Geometry();
-                    data = cacheEntry.cached_data;
-                    vertexID = 0;
-                    for (i = 0; i < data.length && cmpTimes(data[i], this.xAxis.domainHi) < 0; i++) {
-                        // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
-                        vertexVect = new THREE.Vector3(Math.floor(data[i][0] / 1000000), data[i][3], data[i][0] % 1000000);
-
-                        for (var j = 0; j < 4; j++) {
-                            // These are reference copies, but that's OK since it gets sent to the vertex shader
-                            graph.vertices.push(vertexVect);
-                            timeNanos.push(data[i][1]);
-                        }
-                        
-                        vertexID += 4;
-                        
-                        /*for (j = 0; j < 6; j++) {
-                            pvect = new THREE.Vector3(x, y, 0);
-                            pvect.add(transforms[j]);
-                            points.vertices.push(pvect);
-                        }
-                        
-                        pointID += 6;*/
-                        
-                        if (i == 0) {
-                            normals.push(new THREE.Vector3(0, 0, 1));
-                            normals.push(new THREE.Vector3(0, 0, 1));
-                        } else {
-                            tempTime = subTimes(data[i].slice(0, 2), data[i - 1]);
-                            normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[i][3] - data[i - 1][3], 0);
-                            // Again, reference copies are OK because it gets sent to the vertex shader
-                            normals.push(normal);
-                            normals.push(normal.clone());
-                            normals.push(normal);
-                            normals.push(normals[vertexID - 5]);
-                            normals[vertexID - 5].negate();
-
-                            
-                            // It seems that faces only show up if you traverse their vertices counterclockwise
-                            graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-                            graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-                            
-                            /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
-                            points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
-                            points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-                            points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
-                        }
-                    }
-                    graph.verticesNeedUpdate = true;
-                    graph.elementsNeedUpdate = true;
-                    normals.push(new THREE.Vector3(0, 0, 1));
-                    normals.push(new THREE.Vector3(0, 0, 1));
-                    
-                    cacheEntry.cached_drawing.graph = graph;
-                    cacheEntry.cached_drawing.normals = normals;
-                    cacheEntry.cached_drawing.timeNanos = timeNanos;
-                
-                    shader = new THREE.ShaderMaterial({
-                        uniforms: {
-                            "affineMatrix": {type: 'm4', value: affineMatrix},
-                            "rot90Matrix": {type: 'm3', value: this.rotator90},
-                            "thickness": {type: 'f', value: THICKNESS},
-                            "yDomainLo": {type: 'f', value: this.yAxis.domainLo},
-                            "xDomainLo1000": {type: 'f', value: Math.floor(this.xAxis.domainLo[0] / 1000000)},
-                            "xDomainLoMillis": {type: 'f', value: this.xAxis.domainLo[0] % 1000000},
-                            "xDomainLoNanos": {type: 'f', value: this.xAxis.domainLo[1]}
-                            },
-                        attributes: {
-                            "normalVector": {type: 'v3', value: normals},
-                            "timeNanos": {type: 'f', value: timeNanos}
-                            },
-                        vertexShader: " \
-                            uniform mat4 affineMatrix; \
-                            uniform mat3 rot90Matrix; \
-                            uniform float thickness; \
-                            uniform float yDomainLo; \
-                            uniform float xDomainLo1000; \
-                            uniform float xDomainLoMillis; \
-                            uniform float xDomainLoNanos; \
-                            attribute vec3 normalVector; \
-                            attribute float timeNanos; \
-                            void main() { \
-                                float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
-                                vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
-                                vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
-                                gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
-                             } \
-                             ",
-                        fragmentShader: "\
-                             void main() { \
-                                 gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
-                             } \
-                             "
-                    });
-                    
-                    cacheEntry.cached_drawing.shader = shader;
+                if (!cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                    // Compute the information we need to draw the graph
+                    cacheDrawing(cacheEntry);
                 }
+                
+                graph = cacheEntry.cached_drawing.graph;
+                shader = cacheEntry.cached_drawing.shader;
+                shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.rot90Matrix.value = this.rotator90;
+                shader.uniforms.thickness.value = THICKNESS;
+                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
+                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
                 
                 mesh = new THREE.Mesh(graph, shader);
                 
@@ -310,4 +211,8 @@ Plot.prototype.resizeToMargins = function () {
             this.plotspGeom.vertices[i].addVectors(this.plotbgGeom.vertices[i], this.innermarginOffsets[i]);
         }
         this.plotspGeom.verticesNeedUpdate = true;
+    };
+    
+Plot.prototype.click = function () {
+        console.log("clicked");
     };

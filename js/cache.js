@@ -180,6 +180,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
                             data = JSON.parse(streamdata)[0].XReadings;
                         } catch (err) {
                             console.log('Invalid data response from server: ' + err);
+                            console.log(streamdata);
                             // Just use the previous data that was cached for drawing
                             callback(undefined);
                             return;
@@ -216,6 +217,12 @@ Cache.prototype.makeDataRequest = function (uuid, queryStart, queryEnd, pointwid
         the range by half a pointwidth on each side to compensate for that. */
         var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
         var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
+        
+        if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
+            trueEnd[0] = trueStart[0];
+            trueEnd[1] = trueStart[1];
+            subTimes(trueStart, [0, 1]);
+        }
         
         var req = uuid + '?starttime=' + timeToStr(trueStart) + '&endtime=' + timeToStr(trueEnd) + '&unitoftime=ns&pw=' + pointwidthexp;
         if (caching) {
@@ -612,4 +619,106 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         // If target is still less than loadedData, it means that target isn't big enough to accomodate the data that needs to be displayed on the screen
         return true;
     };
+ 
+/** Create a geometry and shader so that the data can be drawn quickly. */   
+function cacheDrawing(cacheEntry) {
+    var graph = new THREE.Geometry();
+    var data = cacheEntry.cached_data;
+    var vertexID = 0;
+    var vertexVect;
+    var timeNanos = [];
+    var normals = [];
+    var shader;
+    for (i = 0; i < data.length; i++) {
+        // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
+        vertexVect = new THREE.Vector3(Math.floor(data[i][0] / 1000000), data[i][3], data[i][0] % 1000000);
+
+        for (var j = 0; j < 4; j++) {
+            // These are reference copies, but that's OK since it gets sent to the vertex shader
+            graph.vertices.push(vertexVect);
+            timeNanos.push(data[i][1]);
+        }
+        
+        vertexID += 4;
+        
+        /*for (j = 0; j < 6; j++) {
+            pvect = new THREE.Vector3(x, y, 0);
+            pvect.add(transforms[j]);
+            points.vertices.push(pvect);
+        }
+        
+        pointID += 6;*/
+        
+        if (i == 0) {
+            normals.push(new THREE.Vector3(0, 0, 1));
+            normals.push(new THREE.Vector3(0, 0, 1));
+        } else {
+            tempTime = subTimes(data[i].slice(0, 2), data[i - 1]);
+            normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[i][3] - data[i - 1][3], 0);
+            // Again, reference copies are OK because it gets sent to the vertex shader
+            normals.push(normal);
+            normals.push(normal.clone());
+            normals.push(normal);
+            normals.push(normals[vertexID - 5]);
+            normals[vertexID - 5].negate();
+
+            
+            // It seems that faces only show up if you traverse their vertices counterclockwise
+            graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+            graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+            
+            /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
+            points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
+            points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
+            points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+        }
+    }
     
+    shader = new THREE.ShaderMaterial({
+        uniforms: {
+            "affineMatrix": {type: 'm4'},
+            "rot90Matrix": {type: 'm3'},
+            "thickness": {type: 'f'},
+            "yDomainLo": {type: 'f'},
+            "xDomainLo1000": {type: 'f'},
+            "xDomainLoMillis": {type: 'f'},
+            "xDomainLoNanos": {type: 'f'}
+            },
+        attributes: {
+            "normalVector": {type: 'v3', value: normals},
+            "timeNanos": {type: 'f', value: timeNanos}
+            },
+        vertexShader: " \
+            uniform mat4 affineMatrix; \
+            uniform mat3 rot90Matrix; \
+            uniform float thickness; \
+            uniform float yDomainLo; \
+            uniform float xDomainLo1000; \
+            uniform float xDomainLoMillis; \
+            uniform float xDomainLoNanos; \
+            attribute vec3 normalVector; \
+            attribute float timeNanos; \
+            void main() { \
+                float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
+                vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
+                vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
+                gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
+             } \
+             ",
+        fragmentShader: "\
+             void main() { \
+                 gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
+             } \
+             "
+    });
+    
+    graph.verticesNeedUpdate = true;
+    graph.elementsNeedUpdate = true;
+    normals.push(new THREE.Vector3(0, 0, 1));
+    normals.push(new THREE.Vector3(0, 0, 1));
+    
+    cacheEntry.cached_drawing.graph = graph;
+    cacheEntry.cached_drawing.normals = normals;
+    cacheEntry.cached_drawing.timeNanos = timeNanos;
+    cacheEntry.cached_drawing.shader = shader;
+}

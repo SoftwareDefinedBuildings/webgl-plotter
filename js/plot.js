@@ -62,6 +62,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // geometries currently being displayed
     this.geometries = [];
+    
+    // used to keep track of caching data
+    this.drawRequestID = 0;
 }
 
 /** Just draw the same data again with the new x-axis. In other words, we just
@@ -84,16 +87,31 @@ Plot.prototype.fullUpdate = function (callback) {
         
         this.pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWide));
         
+        console.log(this.pwe);
+        
         var numstreams = this.plotter.selectedStreams.length;
         var numreplies = 0;
         var newDrawingCache = {};
         
         var self = this;
         var currUUID;
+        
+        var thisRequestID = ++this.drawRequestID;
+        var loRequestTime = roundTime(this.xAxis.domainLo.slice(0, 2));
+        var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
         for (var i = 0; i < numstreams; i++) {
             currUUID = this.plotter.selectedStreams[i].uuid;
-            this.dataCache.getData(currUUID, this.pwe, roundTime(this.xAxis.domainLo.slice(0, 2)), roundTime(this.xAxis.domainHi.slice(0, 2)), (function (uuid) {
+            this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
+                            if (thisRequestID != self.drawRequestID) {
+                                return; // another request has been made, so stop
+                            }
+                            
+                            // start caching data in advance
+                            setTimeout(function () {
+                                    self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
+                                }, 0);
+                            
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
                             if (numreplies == numstreams) {
@@ -105,6 +123,40 @@ Plot.prototype.fullUpdate = function (callback) {
                         };
                 })(currUUID), false);
         }
+    };
+    
+Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endTime) {
+        var sideCache = subTimes(endTime.slice(0), startTime);
+        if (drawID != this.drawRequestID || true) {
+            return;
+        }
+        var self = this;
+        var leftStart = subTimes(startTime.slice(0), sideCache);
+        var rightEnd = addTimes(sideCache, endTime);
+        self.dataCache.getData(uuid, pwe, leftStart.slice(0), startTime.slice(0), function () {
+                if (drawID != self.drawRequestID) {
+                    return;
+                }
+                self.dataCache.getData(uuid, pwe, endTime.slice(0), rightEnd.slice(0), function () {
+                        if (drawID != self.drawRequestID || pwe == 0) {
+                            return;
+                        }
+                        self.dataCache.getData(uuid, pwe - 1, leftStart.slice(0), rightEnd.slice(0), function () {
+                                if (drawID != self.drawRequestID || pwe == 1) {
+                                    return;
+                                }
+                                self.dataCache.getData(uuid, pwe + 1, leftStart.slice(0), rightEnd.slice(0), function () {
+                                        if (drawID != self.drawRequestID) {
+                                            return;
+                                        }
+                                        self.dataCache.getData(uuid, pwe - 2, leftStart.slice(0), rightEnd.slice(0), function () {
+                                                // Any GUI work to notify the user that caching is complete should be done here
+                                                console.log("finished caching");
+                                            }, true);
+                                    }, true);
+                            }, true);
+                    }, true);
+            }, true);
     };
 
 Plot.prototype.drawGraph1 = function () {

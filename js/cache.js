@@ -358,7 +358,16 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
                 n++;
             }
         }
-        var cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, [data.slice(m, n)]), dataAfter));
+        var cacheEntry;
+        if (m == n) {
+            if (dataBefore.length > 0) {
+                cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge(dataBefore, dataAfter));
+            } else {
+                cacheEntry = new CacheEntry(cacheStart, cacheEnd, dataAfter);
+            }
+        } else {
+            cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, [data.slice(m, n)]), dataAfter));
+        }
         var loadedStreams = this.loadedStreams;
         var entryLength;
         for (var k = i; k <= j; k++) {
@@ -688,6 +697,9 @@ function cacheDrawing(cacheEntry) {
                 normals.push(new THREE.Vector3(0, 0, 1));
                 normals.push(new THREE.Vector3(0, 0, 1));
             } else {
+                if (prevI == undefined) {
+                    console.log(i + " " + k + " " + prevI + " " + prevK);
+                }
                 tempTime = subTimes(data
                 [k]
                 [i]

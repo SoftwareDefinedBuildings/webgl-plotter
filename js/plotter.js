@@ -82,7 +82,6 @@ function Plotter() {
         };
         
     this.canvas.addEventListener("DOMMouseScroll", function (event) { // for Firefox
-            console.log("scrolled");
             var ray = self.getMouseRay(event);
             var intersections = ray.intersectObjects(self.scrollables);
             

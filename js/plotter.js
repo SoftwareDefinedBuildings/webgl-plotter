@@ -58,8 +58,16 @@ function Plotter() {
         });
         
     $(this.canvas).mousemove(function (event) {
+            var dx, dy;
+            if (event.originalEvent.hasOwnProperty("movementX")) {
+                dx = event.originalEvent.movementX;
+                dy = event.originalEvent.movementY;
+            } else {
+                dx = event.originalEvent.mozMovementX;
+                dy = event.originalEvent.mozMovementY;
+            }
             for (var i = 0; i < self.draggables.length; i++) {
-                self.draggables[i].wrapper.drag(event.originalEvent.movementX, event.originalEvent.movementY);
+                self.draggables[i].wrapper.drag(dx, dy);
             }
         });
         
@@ -72,6 +80,17 @@ function Plotter() {
                 return false;
             }
         };
+        
+    this.canvas.addEventListener("DOMMouseScroll", function (event) { // for Firefox
+            console.log("scrolled");
+            var ray = self.getMouseRay(event);
+            var intersections = ray.intersectObjects(self.scrollables);
+            
+            if (intersections.length > 0) {
+                intersections[0].object.wrapper.scroll(-120 * event.detail);
+                event.preventDefault();
+            }
+        }, false);
     
     // all requests for external resources are done through the Requester
     //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');

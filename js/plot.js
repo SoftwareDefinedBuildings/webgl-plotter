@@ -78,7 +78,7 @@ Plot.prototype.quickUpdate = function () {
     may have changed. In other words, we search in the second level of cache
     and draw the correct data. The method is not guaranteed to call CALLBACK
     synchronously, though it might. */
-Plot.prototype.fullUpdate = function (callback) {
+Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         // Compute the new point width exponent
         var nanoDiff = this.endTime.slice(0);
         subTimes(nanoDiff, this.startTime);
@@ -102,7 +102,6 @@ Plot.prototype.fullUpdate = function (callback) {
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
                             if (thisRequestID != self.drawRequestID) {
-                                console.log("cancelling");
                                 return; // another request has been made, so stop
                             }
                             
@@ -127,7 +126,7 @@ Plot.prototype.fullUpdate = function (callback) {
                                         cacheEntry = self.drawingCache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
                                         if (!cacheEntry.inSecondaryCache && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
-                                            freeDrawing(cacheEntry);
+                                            cacheEntry.freeDrawing();
                                         }
                                     }
                                 }
@@ -137,7 +136,9 @@ Plot.prototype.fullUpdate = function (callback) {
                         };
                 })(currUUID), false);
         }
-        this.drawGraph3();
+        if (tempUpdate) {
+            this.drawGraph3();
+        }
     };
     
 Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endTime) {
@@ -166,7 +167,6 @@ Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endT
                                         }
                                         self.dataCache.getData(uuid, pwe - 2, leftStart.slice(0), rightEnd.slice(0), function () {
                                                 // Any GUI work to notify the user that caching is complete should be done here
-                                                console.log("finished caching");
                                             }, true);
                                     }, true);
                             }, true);
@@ -184,7 +184,7 @@ Plot.prototype.drawGraph1 = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph2();
-            });
+            }, false);
     };
     
 Plot.prototype.drawGraph2 = function () {
@@ -314,7 +314,7 @@ Plot.prototype.stopDrag = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
-            });
+            }, true);
     };
     
 Plot.prototype.drag = function (deltaX, deltaY) {
@@ -344,5 +344,5 @@ Plot.prototype.scroll = function (amount) {
         // Update the screen
         this.fullUpdate(function () {
                 self.drawGraph3();
-            });
+            }, true);
     };

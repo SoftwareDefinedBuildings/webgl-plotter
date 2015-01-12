@@ -42,6 +42,26 @@ function CacheEntry(startTime, endTime, data) {
     this.inSecondaryCache = true;
 }
 
+CacheEntry.prototype.getLength = function () {
+        var length = 0;
+        for (var i = 0; i < this.cached_data.length; i++) {
+            length += this.cached_data[i].length;
+        }
+        return length;
+    };
+    
+CacheEntry.prototype.freeDrawing = function () {
+        this.cached_drawing.graph.dispose();
+        delete this.cached_drawing.graph;
+    };
+    
+CacheEntry.prototype.removeFromSecCache = function () {
+        this.inSecondaryCache = false;
+        if (this.cached_drawing.hasOwnProperty("graph") && !this.inPrimaryCache) {
+            this.freeDrawing();
+        }
+    };
+
 /* Ensures that CACHE, an array of cache entries, is not corrupted. Included
    for debugging. */
 Cache.prototype.validateCache = function (cache) {
@@ -85,7 +105,7 @@ Cache.prototype.validateLoaded = function () {
                     if (dataCache[uuid].hasOwnProperty(pw)) {
                         cache = dataCache[uuid][pw];
                         for (i = 0; i < cache.length; i++) {
-                            total += getCacheEntryLength(cache[i]);
+                            total += cache[i].getLength();
                         }
                     }
                 }
@@ -101,7 +121,7 @@ Cache.prototype.validateLoaded = function () {
 function validateContiguous(cacheEntry, pwe) {
     var di;
     var pw = Math.pow(2, pwe);
-    var diLimit = getCacheEntryLength(cacheEntry) - 1;
+    var diLimit = cacheEntry.getLength() - 1;
     for (di = 0; di < diLimit; di++) {
         if (((cacheEntry.cached_data[di + 1][0] - cacheEntry.cached_data[di][0]) * 1000000) + cacheEntry.cached_data[di + 1][1] - cacheEntry.cached_data[di][1] != pw) {
             console.log('Gap');
@@ -372,14 +392,14 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
         var entryLength;
         for (var k = i; k <= j; k++) {
             // Update the amount of data has been loaded into the cache
-            entryLength = getCacheEntryLength(cache[k]);
+            entryLength = cache[k].getLength();
             this.loadedData -= entryLength;
             loadedStreams[uuid] -= entryLength;
             
             // Dispose of the geometries to avoid leaking memory
-            removeFromSecCache(cache[k]);
+            cache[k].removeFromSecCache();
         }
-        entryLength = getCacheEntryLength(cacheEntry); // Perhaps we could optimize this? Probably not necessary though.
+        entryLength = cacheEntry.getLength(); // Perhaps we could optimize this? Probably not necessary though.
         this.loadedData += entryLength;
         loadedStreams[uuid] += entryLength;
         cache.splice(i, j - i + 1, cacheEntry);
@@ -476,7 +496,7 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                     if (index > 0 && cmpTimes(entries[index].start_time, lastTime) > 0 && cmpTimes(entries[index - 1].end_time, lastTime) > 0) {
                         index--;
                     }
-                    if (cmpTimes(entries[index].start_time, lastTime) <= 0 && (datalength = getCacheEntryLength(entries[index])) > 0) {
+                    if (cmpTimes(entries[index].start_time, lastTime) <= 0 && (datalength = entries[index].getLength) > 0) {
                         data = entries[index].cached_data;
                         var entryIndex = binSearchCmp(data, [lastTime], cmpFirstTimes); // Needs to be updated
                         if (cmpFirstTimes(data[entryIndex], [lastTime]) <= 0) {
@@ -499,7 +519,7 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                     }
                     var excised = entries.splice(0, index);
                     for (var i = 0; i < excised.length; i++) {
-                        this.loadedData -= getCacheEntryLength(excised[i]);
+                        this.loadedData -= excised[i].getLength();
                     }
                 }
             }
@@ -543,10 +563,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                     for (pointwidth in this.dataCache[uuid]) {
                         if (this.dataCache[uuid].hasOwnProperty(pointwidth)) {
                             for (i = 0; i < this.dataCache[uuid][pointwidth].length; i++) {
-                                if (this.dataCache[uuid][pointwidth][i].cached_drawing.hasOwnProperty("graph")) {
-                                    this.dataCache[uuid][pointwidth][i].cached_drawing.graph.dispose();
-                                    delete this.dataCache[uuid][pointwidth][i].cached_drawing.graph;
-                                }
+                                this.dataCache[uuid][pointwidth][i].removeFromSecCache();
                             }
                         }
                     }
@@ -597,11 +614,8 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                     pwdata = dataCache[uuid][pointwidth];
                     pwcount = 0;
                     for (k = pwdata.length - 1; k >= 0; k--) {
-                        pwcount += getCacheEntryLength(pwdata[k]);
-                        if (pwdata[k].cached_drawing.hasOwnProperty("graph")) {
-                            pwdata[k].cached_drawing.graph.dispose();
-                            delete pwdata[k].cached_drawing.graph;
-                        }
+                        pwcount += pwdata[k].getLength();
+                        pwdata[k].removeFromSecCache();
                     }
                     delete dataCache[uuid][pointwidth];
                     this.loadedData -= pwcount;
@@ -621,11 +635,8 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                 if ((cmpTimes(pwdata[j].start_time, startTime) <= 0 && cmpTimes(pwdata[j].end_time, endTime) >= 0) || (cmpTimes(pwdata[j].start_time, startTime) >= 0 && cmpTimes(pwdata[j].start_time, endTime) <= 0) || (cmpTimes(pwdata[j].end_time, startTime) >= 0 && cmpTimes(pwdata[j].end_time, endTime) <= 0)) {
                     continue; // This is the cache entry being displayed; we won't delete it
                 }
-                pwcount += getCacheEntryLength(pwdata[j]);
-                if (pwdata[j].cached_drawing.hasOwnProperty("graph")) {
-                    pwdata[j].cached_drawing.graph.dispose();
-                    delete pwdata[j].cached_drawing.graph;
-                }
+                pwcount += pwdata[j].getLength();
+                pwdata[j].removeFromSecCache();
                 pwdata.splice(j, 1);
             }
             this.loadedData -= pwcount;
@@ -648,10 +659,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
             if (cmpTimes(pwdata[k], endTime) <= 0 && k < pwdata.length - 1) {
                 k++;
             }
-            if (dataCache[streams[i].uuid][currPWE][0].cached_drawing.hasOwnProperty("graph")) {
-                dataCache[streams[i].uuid][currPWE][0].cached_drawing.graph.dispose();
-                delete dataCache[streams[i].uuid][currPWE][0].cached_drawing.graph;
-            }
+            dataCache[streams[i].uuid][currPWE][0].removeFromSecCache();
             dataCache[streams[i].uuid][currPWE][0] = new CacheEntry([pwdata[j][0], pwdata[j][1]], [pwdata[k][0], pwdata[k][1]], pwdata.slice(j, k));
             loadedStreams[streams[i].uuid] += (k - j);
             this.loadedData += (k - j);
@@ -779,22 +787,3 @@ function cacheDrawing(cacheEntry) {
     cacheEntry.cached_drawing.shader = shader;
 }
 
-function removeFromSecCache(entry) {
-    entry.inSecondaryCache = false;
-    if (entry.cached_drawing.hasOwnProperty("graph") && !entry.inPrimaryCache) {
-        freeDrawing(entry);
-    }
-}
-
-function freeDrawing(entry) {
-    entry.cached_drawing.graph.dispose();
-    delete entry.cached_drawing.graph;
-}
-
-function getCacheEntryLength(entry) {
-    var length = 0;
-    for (var i = 0; i < entry.cached_data.length; i++) {
-        length += entry.cached_data[i].length;
-    }
-    return length;
-}

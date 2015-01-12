@@ -38,6 +38,8 @@ function CacheEntry(startTime, endTime, data) {
     this.end_time = endTime;
     this.cached_data = data;
     this.cached_drawing = {};
+    this.inPrimaryCache = false;
+    this.inSecondaryCache = true;
 }
 
 /* Ensures that CACHE, an array of cache entries, is not corrupted. Included
@@ -83,7 +85,7 @@ Cache.prototype.validateLoaded = function () {
                     if (dataCache[uuid].hasOwnProperty(pw)) {
                         cache = dataCache[uuid][pw];
                         for (i = 0; i < cache.length; i++) {
-                            total += cache[i].cached_data.length;
+                            total += getCacheEntryLength(cache[i]);
                         }
                     }
                 }
@@ -99,7 +101,8 @@ Cache.prototype.validateLoaded = function () {
 function validateContiguous(cacheEntry, pwe) {
     var di;
     var pw = Math.pow(2, pwe);
-    for (di = 0; di < cacheEntry.cached_data.length - 1; di++) {
+    var diLimit = getCacheEntryLength(cacheEntry) - 1;
+    for (di = 0; di < diLimit; di++) {
         if (((cacheEntry.cached_data[di + 1][0] - cacheEntry.cached_data[di][0]) * 1000000) + cacheEntry.cached_data[di + 1][1] - cacheEntry.cached_data[di][1] != pw) {
             console.log('Gap');
             console.log(((cacheEntry.cached_data[di + 1][0] - cacheEntry.cached_data[di][0]) * 1000000) + cacheEntry.cached_data[di + 1][1] - cacheEntry.cached_data[di][1]);
@@ -219,6 +222,9 @@ Cache.prototype.makeDataRequest = function (uuid, queryStart, queryEnd, pointwid
         in terms of the midpoints of the intervals I get back; the real archiver
         will give me back all intervals that touch the query range. So I shrink
         the range by half a pointwidth on each side to compensate for that. */
+        if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
+            halfpwnanos = [0, 0];
+        }
         var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
         var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
         
@@ -352,21 +358,21 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
                 n++;
             }
         }
-        var cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, data.slice(m, n)), dataAfter));
+        var cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, [data.slice(m, n)]), dataAfter));
         var loadedStreams = this.loadedStreams;
+        var entryLength;
         for (var k = i; k <= j; k++) {
             // Update the amount of data has been loaded into the cache
-            this.loadedData -= cache[k].cached_data.length;
-            loadedStreams[uuid] -= cache[k].cached_data.length;
+            entryLength = getCacheEntryLength(cache[k]);
+            this.loadedData -= entryLength;
+            loadedStreams[uuid] -= entryLength;
             
             // Dispose of the geometries to avoid leaking memory
-            if (cache[k].cached_drawing.hasOwnProperty("graph")) {
-                cache[k].cached_drawing.graph.dispose();
-                delete cache[k].cached_drawing.graph;
-            }
+            removeFromSecCache(cache[k]);
         }
-        this.loadedData += cacheEntry.cached_data.length;
-        loadedStreams[uuid] += cacheEntry.cached_data.length;
+        entryLength = getCacheEntryLength(cacheEntry); // Perhaps we could optimize this? Probably not necessary though.
+        this.loadedData += entryLength;
+        loadedStreams[uuid] += entryLength;
         cache.splice(i, j - i + 1, cacheEntry);
         callback(cacheEntry);
     };
@@ -448,7 +454,7 @@ function cmpEntryEnds(entry1, entry2) {
    LASTTIME is specified in milliseconds in Universal Coordinated Time (UTC). */
 Cache.prototype.trimCache = function (uuid, lastTime) {
         var dataCache = this.dataCache;
-        var data;
+        var data, datalength;
         if (dataCache.hasOwnProperty(uuid)) {
             var cache = dataCache[uuid];
             for (var resolution in cache) {
@@ -461,25 +467,39 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                     if (index > 0 && cmpTimes(entries[index].start_time, lastTime) > 0 && cmpTimes(entries[index - 1].end_time, lastTime) > 0) {
                         index--;
                     }
-                    if (cmpTimes(entries[index].start_time, lastTime) <= 0 && (data = entries[index].cached_data).length > 0) {
-                        var entryIndex = binSearchCmp(data, lastTime, cmpTimes);
-                        if (cmpTimes(data[entryIndex], lastTime) <= 0) {
+                    if (cmpTimes(entries[index].start_time, lastTime) <= 0 && (datalength = getCacheEntryLength(entries[index])) > 0) {
+                        data = entries[index].cached_data;
+                        var entryIndex = binSearchCmp(data, [lastTime], cmpFirstTimes); // Needs to be updated
+                        if (cmpFirstTimes(data[entryIndex], [lastTime]) <= 0) {
                             entryIndex++;
                         }
+                        var pointIndex = binSearchCmp(data[entryIndex], lastTime, cmpTimes);
+                        if (cmpTimes(data[entryIndex][pointIndex], lastTime) <= 0) {
+                            pointIndex++;
+                        }
                         entries[index].end_time = lastTime;
-                        var numpoints = data.length - entryIndex;
-                        data.splice(entryIndex, numpoints);
+                        var numgroups = entries[index].cached_data.length - entryIndex - 1;
+                        for (var i = entryIndex + 1; i < data.length; i++) {
+                            this.loadedData -= data[i].length;
+                        }
+                        data.splice(entryIndex + 1, numgroups);
+                        var numpoints = data[entryIndex].length - pointIndex - 1;
+                        data[entryIndex].splice(pointIndex, numpoints);
                         this.loadedData -= numpoints;
                         index++;
                     }
                     var excised = entries.splice(0, index);
                     for (var i = 0; i < excised.length; i++) {
-                        this.loadedData -= excised[i].cached_data.length;
+                        this.loadedData -= getCacheEntryLength(excised[i]);
                     }
                 }
             }
         }
     };
+    
+function cmpFirstTimes(entry1, entry2) {
+    return cmpTimes(entry1[0], entry2[0]);
+}
 
 /* Reduce memory consumption by removing some cached data. STARTTIME and
    ENDTIME are in UTC (Universal Coord. Time) and represent the extent of the
@@ -568,7 +588,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                     pwdata = dataCache[uuid][pointwidth];
                     pwcount = 0;
                     for (k = pwdata.length - 1; k >= 0; k--) {
-                        pwcount += pwdata[k].cached_data.length;
+                        pwcount += getCacheEntryLength(pwdata[k]);
                         if (pwdata[k].cached_drawing.hasOwnProperty("graph")) {
                             pwdata[k].cached_drawing.graph.dispose();
                             delete pwdata[k].cached_drawing.graph;
@@ -592,7 +612,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                 if ((cmpTimes(pwdata[j].start_time, startTime) <= 0 && cmpTimes(pwdata[j].end_time, endTime) >= 0) || (cmpTimes(pwdata[j].start_time, startTime) >= 0 && cmpTimes(pwdata[j].start_time, endTime) <= 0) || (cmpTimes(pwdata[j].end_time, startTime) >= 0 && cmpTimes(pwdata[j].end_time, endTime) <= 0)) {
                     continue; // This is the cache entry being displayed; we won't delete it
                 }
-                pwcount += pwdata[j].cached_data.length;
+                pwcount += getCacheEntryLength(pwdata[j]);
                 if (pwdata[j].cached_drawing.hasOwnProperty("graph")) {
                     pwdata[j].cached_drawing.graph.dispose();
                     delete pwdata[j].cached_drawing.graph;
@@ -641,48 +661,60 @@ function cacheDrawing(cacheEntry) {
     var timeNanos = [];
     var normals = [];
     var shader;
-    for (i = 0; i < data.length; i++) {
-        // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
-        vertexVect = new THREE.Vector3(Math.floor(data[i][0] / 1000000), data[i][3], data[i][0] % 1000000);
+    var i, j, k;
+    var prevI, prevK;
+    for (k = 0; k < data.length; k++) {
+        for (i = 0; i < data[k].length; i++) {
+            // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
+            vertexVect = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][3], data[k][i][0] % 1000000);
 
-        for (var j = 0; j < 4; j++) {
-            // These are reference copies, but that's OK since it gets sent to the vertex shader
-            graph.vertices.push(vertexVect);
-            timeNanos.push(data[i][1]);
-        }
-        
-        vertexID += 4;
-        
-        /*for (j = 0; j < 6; j++) {
-            pvect = new THREE.Vector3(x, y, 0);
-            pvect.add(transforms[j]);
-            points.vertices.push(pvect);
-        }
-        
-        pointID += 6;*/
-        
-        if (i == 0) {
-            normals.push(new THREE.Vector3(0, 0, 1));
-            normals.push(new THREE.Vector3(0, 0, 1));
-        } else {
-            tempTime = subTimes(data[i].slice(0, 2), data[i - 1]);
-            normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[i][3] - data[i - 1][3], 0);
-            // Again, reference copies are OK because it gets sent to the vertex shader
-            normals.push(normal);
-            normals.push(normal.clone());
-            normals.push(normal);
-            normals.push(normals[vertexID - 5]);
-            normals[vertexID - 5].negate();
+            for (j = 0; j < 4; j++) {
+                // These are reference copies, but that's OK since it gets sent to the vertex shader
+                graph.vertices.push(vertexVect);
+                timeNanos.push(data[k][i][1]);
+            }
+            
+            vertexID += 4;
+            
+            /*for (j = 0; j < 6; j++) {
+                pvect = new THREE.Vector3(x, y, 0);
+                pvect.add(transforms[j]);
+                points.vertices.push(pvect);
+            }
+            
+            pointID += 6;*/
+            
+            if (i == 0 && k == 0) {
+                normals.push(new THREE.Vector3(0, 0, 1));
+                normals.push(new THREE.Vector3(0, 0, 1));
+            } else {
+                tempTime = subTimes(data
+                [k]
+                [i]
+                .slice(0, 2),
+                data
+                [prevK]
+                [prevI]);
+                normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - data[prevK][prevI][3], 0);
+                // Again, reference copies are OK because it gets sent to the vertex shader
+                normals.push(normal);
+                normals.push(normal.clone());
+                normals.push(normal);
+                normals.push(normals[vertexID - 5]);
+                normals[vertexID - 5].negate();
 
-            
-            // It seems that faces only show up if you traverse their vertices counterclockwise
-            graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-            graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-            
-            /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
-            points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
-            points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-            points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+                
+                // It seems that faces only show up if you traverse their vertices counterclockwise
+                graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                
+                /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
+                points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
+                points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
+                points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+            }
+            prevI = i;
+            prevK = k;
         }
     }
     
@@ -733,4 +765,24 @@ function cacheDrawing(cacheEntry) {
     cacheEntry.cached_drawing.normals = normals;
     cacheEntry.cached_drawing.timeNanos = timeNanos;
     cacheEntry.cached_drawing.shader = shader;
+}
+
+function removeFromSecCache(entry) {
+    entry.inSecondaryCache = false;
+    if (entry.cached_drawing.hasOwnProperty("graph") && !entry.inPrimaryCache) {
+        freeDrawing(entry);
+    }
+}
+
+function freeDrawing(entry) {
+    entry.cached_drawing.graph.dispose();
+    delete entry.cached_drawing.graph;
+}
+
+function getCacheEntryLength(entry) {
+    var length = 0;
+    for (var i = 0; i < entry.cached_data.length; i++) {
+        length += entry.cached_data[i].length;
+    }
+    return length;
 }

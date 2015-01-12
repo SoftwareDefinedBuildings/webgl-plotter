@@ -74,7 +74,8 @@ function Plotter() {
         };
     
     // all requests for external resources are done through the Requester
-    this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
+    //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
+	this.requester = new Requester('http://localhost:4523/', 'http://asylum.cs.berkeley.edu:9000/data/uuid/');
         
     this.plot = new Plot(this, 2, 0.5, -100, 0);
         
@@ -87,9 +88,9 @@ function Plotter() {
         
     render(); // start rendering
     
-    this.selectedStreams = [{uuid: "abffcf07-9e17-404a-98c3-ea4d60042ff3"}, {uuid: "4d6525a9-b8ad-48a4-ae98-b171562cf817"}, {uuid: "fe580578-854d-43c5-95b4-9f305a70e6a3"}, {uuid: "888b8f61-c2a4-44a1-bd5c-9865ea6ea8ca"}, {uuid: "9f004502-3f99-4bef-b936-7f860b53bfdf"}, {uuid: "bd46f563-a6e1-4b93-9899-0faf8a70a1b3"}]; // Until we have a working UI, we'll populate this manually.
-    this.selectedStartTime = [1415942251000, 0];
-    this.selectedEndTime = [1416278894000, 0];
+    this.selectedStreams = [{uuid: "abffcf07-9e17-404a-98c3-ea4d60042ff3"}]; // Until we have a working UI, we'll populate this manually.
+    this.selectedStartTime = [1412189933000, 0];
+    this.selectedEndTime = [1412504914000, 0];
 }
 
 Plotter.prototype.updateScreenSize = function () {

@@ -87,8 +87,6 @@ Plot.prototype.fullUpdate = function (callback) {
         
         this.pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWide));
         
-        console.log(this.pwe);
-        
         var numstreams = this.plotter.selectedStreams.length;
         var numreplies = 0;
         var newDrawingCache = {};
@@ -104,30 +102,47 @@ Plot.prototype.fullUpdate = function (callback) {
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
                             if (thisRequestID != self.drawRequestID) {
+                                console.log("cancelling");
                                 return; // another request has been made, so stop
                             }
                             
                             // start caching data in advance
                             setTimeout(function () {
                                     self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
-                                }, 0);
+                                }, 1000);
                             
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
                             if (numreplies == numstreams) {
                                 //console.log(self.drawingCache);
                                 //console.log(newDrawingCache);
+                                var cacheUuid, cacheEntry;
+                                for (cacheUuid in newDrawingCache) {
+                                    if (newDrawingCache.hasOwnProperty(cacheUuid)) {
+                                        newDrawingCache[cacheUuid].inPrimaryCache = true;
+                                    }
+                                }
+                                for (cacheUuid in self.drawingCache) {
+                                    if (self.drawingCache.hasOwnProperty(cacheUuid)) {
+                                        cacheEntry = self.drawingCache[cacheUuid];
+                                        cacheEntry.inPrimaryCache = false;
+                                        if (!cacheEntry.inSecondaryCache && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                                            freeDrawing(cacheEntry);
+                                        }
+                                    }
+                                }
                                 self.drawingCache = newDrawingCache; // replace the first layer of the cache
                                 callback();
                             }
                         };
                 })(currUUID), false);
         }
+        this.drawGraph3();
     };
     
 Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endTime) {
         var sideCache = subTimes(endTime.slice(0), startTime);
-        if (drawID != this.drawRequestID || true) {
+        if (drawID != this.drawRequestID) {
             return;
         }
         var self = this;
@@ -158,6 +173,7 @@ Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endT
                     }, true);
             }, true);
     };
+    
 
 Plot.prototype.drawGraph1 = function () {
         // Normally we'd draw the x axis here. For now, I'm going to skip that.
@@ -180,12 +196,14 @@ Plot.prototype.drawGraph2 = function () {
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 data = this.drawingCache[uuid].cached_data;
-                for (i = 0; i < data.length; i++) {
-                    if (data[i][2] < minval) {
-                        minval = data[i][2];
-                    }
-                    if (data[i][4] > maxval) {
-                        maxval = data[i][4];
+                for (k = 0; k < data.length; k++) {
+                    for (i = 0; i < data[k].length; i++) {
+		        if (data[k][i][2] < minval) {
+		            minval = data[k][i][2];
+		        }
+		        if (data[k][i][4] > maxval) {
+		            maxval = data[k][i][4];
+		        }
                     }
                 }
             }
@@ -303,10 +321,7 @@ Plot.prototype.drag = function (deltaX, deltaY) {
         if (this.scrolling) {
             // Update the axis
             var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
-            this.recomputePixelsWideIfNecessary();
-            
-            this.xAxis.domainHi
-            
+            this.recomputePixelsWideIfNecessary()
             
             var xStart = trueDelta + this.xAxis.rangeLo;
             var deltaTime = subTimes(this.xAxis.unmap(xStart), this.xAxis.domainLo);
@@ -319,8 +334,9 @@ Plot.prototype.drag = function (deltaX, deltaY) {
     };
     
 Plot.prototype.scroll = function (amount) {
+        amount = Math.min(amount, 100);
         var currRange = subTimes(this.xAxis.domainHi.slice(0, 2), this.xAxis.domainLo);
-        mulTime(currRange, amount / 10000);
+        mulTime(currRange, amount / 1000);
         addTimes(this.xAxis.domainLo, currRange);
         subTimes(this.xAxis.domainHi, currRange);
         

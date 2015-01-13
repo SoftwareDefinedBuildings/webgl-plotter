@@ -727,6 +727,8 @@ function cacheDrawing(cacheEntry) {
                 // It seems that faces only show up if you traverse their vertices counterclockwise
                 graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
                 graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
+                graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
                 
                 /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
                 points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));

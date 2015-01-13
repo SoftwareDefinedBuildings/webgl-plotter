@@ -227,7 +227,7 @@ Plot.prototype.drawGraph3 = function () {
         
         // For now, just draw the visible region.
         var data;
-        var graph;
+        var rangegraph;
         var mesh;
         var plot = new THREE.Object3D();
         var cacheEntry;
@@ -242,6 +242,23 @@ Plot.prototype.drawGraph3 = function () {
                     // Compute the information we need to draw the graph
                     cacheDrawing(cacheEntry);
                 }
+                
+                graph = cacheEntry.cached_drawing.rangegraph;
+                shader = cacheEntry.cached_drawing.rangeshader;
+                shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
+                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                
+                mesh = new THREE.Mesh(graph, shader);
+                
+                // The stream must always be drawn. I can't just check if it's in view since the
+                // vertices change drastically due to vertex shading.
+                mesh.frustumCulled = false;
+                
+                plot.add(mesh);
+                
                 
                 graph = cacheEntry.cached_drawing.graph;
                 shader = cacheEntry.cached_drawing.shader;
@@ -260,8 +277,6 @@ Plot.prototype.drawGraph3 = function () {
                 mesh.frustumCulled = false;
                 
                 plot.add(mesh);
-                /*mesh = new THREE.Mesh(points, new THREE.MeshBasicMaterial({color: 0x0000ff}));
-                plot.add(mesh);*/
             }
         }
         if (this.plot != undefined) {

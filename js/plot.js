@@ -216,7 +216,7 @@ Plot.prototype.drawGraph2 = function () {
     
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
-        var THICKNESS = 0.1;
+        var THICKNESS = 0.15;
         /*var transforms = [];
         var i, j;
         transforms.push(new THREE.Vector3(THICKNESS, 0, 0));

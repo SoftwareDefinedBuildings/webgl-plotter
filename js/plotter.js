@@ -98,10 +98,29 @@ function Plotter() {
     this.plot = new Plot(this, 2, 0.5, -100, 0);
         
     this.updateScreenSize();
+    
+    
+    var composer, dpr, effectFXAA, renderScene;
+
+    dpr = 1;
+    if (window.devicePixelRatio !== undefined) {
+      dpr = window.devicePixelRatio;
+    }
+
+    renderScene = new THREE.RenderPass(this.scene, this.camera);
+    //effectFXAA = new THREE.ShaderPass(THREE.CopyShader);
+    effectFXAA = new THREE.ShaderPass(THREE.FXAAShader);
+    effectFXAA.uniforms['resolution'].value.set(1 / (this.width * dpr), 1 / (this.height * dpr));
+    effectFXAA.renderToScreen = true;
+
+    composer = new THREE.EffectComposer(this.renderer);
+    composer.setSize(this.width * dpr, this.height * dpr);
+    composer.addPass(renderScene);
+    composer.addPass(effectFXAA);
            
     var render = function () {
             requestAnimationFrame(render);
-            self.renderer.render(self.scene, self.camera);
+            composer.render(0.05);
         };
         
     render(); // start rendering

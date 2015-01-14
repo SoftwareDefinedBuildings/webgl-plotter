@@ -101,8 +101,8 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var loRequestTime = roundTime(this.xAxis.domainLo.slice(0, 2));
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
         
-        if (thisRequestID % 10 == 0) {
-            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 300000, 150000);
+        if (thisRequestID % 5 == 0) {
+            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
         }
         
         for (var i = 0; i < numstreams; i++) {
@@ -151,7 +151,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         var ce = newDrawingCache[cacheUuid];
                                         ce.inPrimaryCache = true;
                                         if (!ce.hasOwnProperty("graph")) {
-                                            cacheDrawing(ce);
+                                            ce.cacheDrawing();
                                         }
                                         
                                         if (self.drawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry
@@ -257,19 +257,14 @@ Plot.prototype.drawGraph2 = function () {
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
         var THICKNESS = 0.15;
-        /*var transforms = [];
-        var i, j;
-        transforms.push(new THREE.Vector3(THICKNESS, 0, 0));
-        for (i = 1; i < 6; i++) {
-            transforms[i] = transforms[i - 1].clone();
-            transforms[i].applyMatrix3(this.rotator60);
-        }*/
-        
-        // For now, just draw the visible region.
         var data;
         var rangegraph;
         var mesh;
-        var plot = new THREE.Object3D();
+        var meshNum = 0;
+        if (this.plot == undefined) {
+            this.plot = new THREE.Object3D();
+            this.plotter.scene.add(this.plot);
+        }
         var cacheEntry;
         var shaders, shader;
         
@@ -278,10 +273,6 @@ Plot.prototype.drawGraph3 = function () {
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 cacheEntry = this.drawingCache[uuid];
-                if (!cacheEntry.cached_drawing.hasOwnProperty("graph")) {
-                    // Compute the information we need to draw the graph
-                    cacheDrawing(cacheEntry);
-                }
                 
                 shaders = this.shaders[uuid];
                 
@@ -293,13 +284,18 @@ Plot.prototype.drawGraph3 = function () {
                 shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
                 shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
                 
-                mesh = new THREE.Mesh(graph, shader);
+                if (meshNum < this.plot.children.length) {
+                    mesh = this.plot.children[meshNum];
+                } else {
+                    mesh = new THREE.Mesh();
+                    mesh.frustumCulled = false;
+                    this.plot.add(mesh);
+                }
                 
-                // The stream must always be drawn. I can't just check if it's in view since the
-                // vertices change drastically due to vertex shading.
-                mesh.frustumCulled = false;
+                meshNum++;
                 
-                plot.add(mesh);
+                mesh.geometry = graph;
+                mesh.material = shader;
                 
                 
                 graph = cacheEntry.cached_drawing.graph;
@@ -312,20 +308,23 @@ Plot.prototype.drawGraph3 = function () {
                 shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
                 shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
                 
-                mesh = new THREE.Mesh(graph, shader);
+                if (meshNum < this.plot.children.length) {
+                    mesh = this.plot.children[meshNum];
+                } else {
+                    mesh = new THREE.Mesh();
+                    mesh.frustumCulled = false;
+                    this.plot.add(mesh);
+                }
                 
-                // The stream must always be drawn. I can't just check if it's in view since the
-                // vertices change drastically due to vertex shading.
-                mesh.frustumCulled = false;
+                meshNum++;
                 
-                plot.add(mesh);
+                mesh.geometry = graph;
+                mesh.material = shader;                
             }
         }
-        if (this.plot != undefined) {
-            this.plotter.scene.remove(this.plot);
+        for (var i = this.plot.children.length - 1; i >= meshNum; i++) {
+            this.plot.remove(this.plot.children[i]);
         }
-        this.plot = plot;
-        this.plotter.scene.add(plot);
     };
 
 Plot.prototype.resizeToMargins = function () {

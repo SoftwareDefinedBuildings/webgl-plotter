@@ -672,164 +672,94 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
     };
  
 /** Create a geometry and shader so that the data can be drawn quickly. */   
-function cacheDrawing(cacheEntry) {
-    var graph = new THREE.Geometry();
-    var rangegraph = new THREE.Geometry();
-    var data = cacheEntry.cached_data;
-    var vertexID = 0;
-    var rangeVertexID = 0;
-    var vertexVect;
-    var timeNanos = [];
-    var normals = [];
-    var rangeTimeNanos = [];
-    var shader, rangeShader;
-    var i, j, k;
-    var prevI, prevK;
-    for (k = 0; k < data.length; k++) {
-        for (i = 0; i < data[k].length; i++) {
-            // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
-            vertexVect = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][3], data[k][i][0] % 1000000);
-            
-            for (j = 0; j < 4; j++) {
-                // These are reference copies, but that's OK since it gets sent to the vertex shader
-                graph.vertices.push(vertexVect);
-                timeNanos.push(data[k][i][1]);
-            }
-            
-            rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][2], data[k][i][0] % 1000000));
-            rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][4], data[k][i][0] % 1000000));
-            
-            rangeTimeNanos.push(data[k][i][1]);
-            rangeTimeNanos.push(data[k][i][1]);
-            
-            rangeVertexID += 2;
-            
-            vertexID += 4;
-            
-            /*for (j = 0; j < 6; j++) {
-                pvect = new THREE.Vector3(x, y, 0);
-                pvect.add(transforms[j]);
-                points.vertices.push(pvect);
-            }
-            
-            pointID += 6;*/
-            
-            if (i == 0 && k == 0) {
-                normals.push(new THREE.Vector3(0, 0, 1));
-                normals.push(new THREE.Vector3(0, 0, 1));
-            } else {
-                tempTime = subTimes(data[k][i].slice(0, 2), data[prevK][prevI]);
-                normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - data[prevK][prevI][3], 0);
-                // Again, reference copies are OK because it gets sent to the vertex shader
-                normals.push(normal);
-                normals.push(normal.clone());
-                normals.push(normal);
-                normals.push(normals[vertexID - 5]);
-                normals[vertexID - 5].negate();
+CacheEntry.prototype.cacheDrawing = function () {
+        var cacheEntry = this;
+        var graph = new THREE.Geometry();
+        var rangegraph = new THREE.Geometry();
+        var data = cacheEntry.cached_data;
+        var vertexID = 0;
+        var rangeVertexID = 0;
+        var vertexVect;
+        var timeNanos = [];
+        var normals = [];
+        var rangeTimeNanos = [];
+        var shader, rangeShader;
+        var i, j, k;
+        var prevI, prevK;
+        for (k = 0; k < data.length; k++) {
+            for (i = 0; i < data[k].length; i++) {
+                // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
+                vertexVect = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][3], data[k][i][0] % 1000000);
+                
+                for (j = 0; j < 4; j++) {
+                    // These are reference copies, but that's OK since it gets sent to the vertex shader
+                    graph.vertices.push(vertexVect);
+                    timeNanos.push(data[k][i][1]);
+                }
+                
+                rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][2], data[k][i][0] % 1000000));
+                rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][4], data[k][i][0] % 1000000));
+                
+                rangeTimeNanos.push(data[k][i][1]);
+                rangeTimeNanos.push(data[k][i][1]);
+                
+                rangeVertexID += 2;
+                
+                vertexID += 4;
+                
+                /*for (j = 0; j < 6; j++) {
+                    pvect = new THREE.Vector3(x, y, 0);
+                    pvect.add(transforms[j]);
+                    points.vertices.push(pvect);
+                }
+                
+                pointID += 6;*/
+                
+                if (i == 0 && k == 0) {
+                    normals.push(new THREE.Vector3(0, 0, 1));
+                    normals.push(new THREE.Vector3(0, 0, 1));
+                } else {
+                    tempTime = subTimes(data[k][i].slice(0, 2), data[prevK][prevI]);
+                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - data[prevK][prevI][3], 0);
+                    // Again, reference copies are OK because it gets sent to the vertex shader
+                    normals.push(normal);
+                    normals.push(normal.clone());
+                    normals.push(normal);
+                    normals.push(normals[vertexID - 5]);
+                    normals[vertexID - 5].negate();
 
-                // It seems that faces only show up if you traverse their vertices counterclockwise
-                graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-                graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-                graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
-                graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
-                
-                /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
-                points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
-                points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-                points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
-                
-                rangegraph.faces.push(new THREE.Face3(rangeVertexID - 1, rangeVertexID - 3, rangeVertexID - 4));
-                rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                    // It seems that faces only show up if you traverse their vertices counterclockwise
+                    graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                    graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
+                    
+                    /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
+                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+                    
+                    rangegraph.faces.push(new THREE.Face3(rangeVertexID - 1, rangeVertexID - 3, rangeVertexID - 4));
+                    rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                }
+                prevI = i;
+                prevK = k;
             }
-            prevI = i;
-            prevK = k;
         }
-    }
-    
-    shader = new THREE.ShaderMaterial({
-            uniforms: {
-                "affineMatrix": {type: 'm4'},
-                "rot90Matrix": {type: 'm3'},
-                "thickness": {type: 'f'},
-                "yDomainLo": {type: 'f'},
-                "xDomainLo1000": {type: 'f'},
-                "xDomainLoMillis": {type: 'f'},
-                "xDomainLoNanos": {type: 'f'}
-                },
-            attributes: {
-                "normalVector": {type: 'v3', value: normals},
-                "timeNanos": {type: 'f', value: timeNanos}
-                },
-            vertexShader: " \
-                uniform mat4 affineMatrix; \
-                uniform mat3 rot90Matrix; \
-                uniform float thickness; \
-                uniform float yDomainLo; \
-                uniform float xDomainLo1000; \
-                uniform float xDomainLoMillis; \
-                uniform float xDomainLoNanos; \
-                attribute vec3 normalVector; \
-                attribute float timeNanos; \
-                void main() { \
-                    float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
-                    vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
-                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
-                    gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
-                 } \
-                 ",
-            fragmentShader: "\
-                 void main() { \
-                     gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
-                 } \
-                 "
-        });
         
-    rangeshader = new THREE.ShaderMaterial({
-            uniforms: {
-                "affineMatrix": {type: 'm4'},
-                "yDomainLo": {type: 'f'},
-                "xDomainLo1000": {type: 'f'},
-                "xDomainLoMillis": {type: 'f'},
-                "xDomainLoNanos": {type: 'f'}
-                },
-            attributes: {
-                "timeNanos": {type: 'f', value: rangeTimeNanos},
-                },
-            vertexShader: " \
-                uniform mat4 affineMatrix; \
-                uniform float yDomainLo; \
-                uniform float xDomainLo1000; \
-                uniform float xDomainLoMillis; \
-                uniform float xDomainLoNanos; \
-                attribute float timeNanos; \
-                void main() { \
-                    float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
-                    vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0); \
-                    gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
-                 } \
-                 ",
-            fragmentShader: "\
-                 void main() { \
-                     gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5); \
-                 } \
-                 "
-        });
+        graph.verticesNeedUpdate = true;
+        graph.elementsNeedUpdate = true;
+        rangegraph.verticesNeedUpdate = true;
+        rangegraph.elementsNeedUpdate = true;
+        normals.push(new THREE.Vector3(0, 0, 1));
+        normals.push(new THREE.Vector3(0, 0, 1));
         
-    rangeshader.transparent = true;
-    
-    graph.verticesNeedUpdate = true;
-    graph.elementsNeedUpdate = true;
-    rangegraph.verticesNeedUpdate = true;
-    rangegraph.elementsNeedUpdate = true;
-    normals.push(new THREE.Vector3(0, 0, 1));
-    normals.push(new THREE.Vector3(0, 0, 1));
-    
-    cacheEntry.cached_drawing.graph = graph;
-    cacheEntry.cached_drawing.rangegraph = rangegraph;
-    cacheEntry.cached_drawing.normals = normals;
-    cacheEntry.cached_drawing.timeNanos = timeNanos;
-    cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;
-}
+        cacheEntry.cached_drawing.graph = graph;
+        cacheEntry.cached_drawing.rangegraph = rangegraph;
+        cacheEntry.cached_drawing.normals = normals;
+        cacheEntry.cached_drawing.timeNanos = timeNanos;
+        cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;
+    };
 
 Cache.makeShaders = function () {
         var shader = new THREE.ShaderMaterial({

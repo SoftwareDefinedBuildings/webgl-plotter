@@ -828,7 +828,80 @@ function cacheDrawing(cacheEntry) {
     cacheEntry.cached_drawing.rangegraph = rangegraph;
     cacheEntry.cached_drawing.normals = normals;
     cacheEntry.cached_drawing.timeNanos = timeNanos;
-    cacheEntry.cached_drawing.shader = shader;
-    cacheEntry.cached_drawing.rangeshader = rangeshader;
+    cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;
 }
 
+Cache.makeShaders = function () {
+        var shader = new THREE.ShaderMaterial({
+            uniforms: {
+                "affineMatrix": {type: 'm4'},
+                "rot90Matrix": {type: 'm3'},
+                "thickness": {type: 'f'},
+                "yDomainLo": {type: 'f'},
+                "xDomainLo1000": {type: 'f'},
+                "xDomainLoMillis": {type: 'f'},
+                "xDomainLoNanos": {type: 'f'}
+                },
+            attributes: {
+                "normalVector": {type: 'v3'},
+                "timeNanos": {type: 'f'}
+                },
+            vertexShader: " \
+                uniform mat4 affineMatrix; \
+                uniform mat3 rot90Matrix; \
+                uniform float thickness; \
+                uniform float yDomainLo; \
+                uniform float xDomainLo1000; \
+                uniform float xDomainLoMillis; \
+                uniform float xDomainLoNanos; \
+                attribute vec3 normalVector; \
+                attribute float timeNanos; \
+                void main() { \
+                    float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
+                    vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
+                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
+                    gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
+                 } \
+                 ",
+            fragmentShader: "\
+                 void main() { \
+                     gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
+                 } \
+                 "
+            });
+        
+        var rangeshader = new THREE.ShaderMaterial({
+                uniforms: {
+                    "affineMatrix": {type: 'm4'},
+                    "yDomainLo": {type: 'f'},
+                    "xDomainLo1000": {type: 'f'},
+                    "xDomainLoMillis": {type: 'f'},
+                    "xDomainLoNanos": {type: 'f'}
+                    },
+                attributes: {
+                    "timeNanos": {type: 'f'},
+                    },
+                vertexShader: " \
+                    uniform mat4 affineMatrix; \
+                    uniform float yDomainLo; \
+                    uniform float xDomainLo1000; \
+                    uniform float xDomainLoMillis; \
+                    uniform float xDomainLoNanos; \
+                    attribute float timeNanos; \
+                    void main() { \
+                        float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
+                        vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0); \
+                        gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
+                     } \
+                     ",
+                fragmentShader: "\
+                     void main() { \
+                         gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5); \
+                     } \
+                     "
+                });
+                
+        rangeshader.transparent = true;
+                
+        return [shader, rangeshader];
+    };

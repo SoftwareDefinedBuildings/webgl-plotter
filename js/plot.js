@@ -65,6 +65,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // used to keep track of caching data
     this.drawRequestID = 0;
+    
+    // reuse ShaderMaterials to gain performance
+    this.shaders = {};
 }
 
 /** Just draw the same data again with the new x-axis. In other words, we just
@@ -113,21 +116,53 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
                             if (numreplies == numstreams) {
-                                //console.log(self.drawingCache);
-                                //console.log(newDrawingCache);
-                                var cacheUuid, cacheEntry;
-                                for (cacheUuid in newDrawingCache) {
-                                    if (newDrawingCache.hasOwnProperty(cacheUuid)) {
-                                        newDrawingCache[cacheUuid].inPrimaryCache = true;
-                                    }
-                                }
+                                var cacheUuid, cacheEntry, shaders;
+                                // Cleanup work for cache entries that are being removed
                                 for (cacheUuid in self.drawingCache) {
                                     if (self.drawingCache.hasOwnProperty(cacheUuid)) {
+                                        if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
+                                            continue;
+                                        }
                                         cacheEntry = self.drawingCache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
                                         if (!cacheEntry.inSecondaryCache && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
                                             cacheEntry.freeDrawing();
                                         }
+                                        if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
+                                            continue;
+                                        }
+                                        shaders = self.shaders[cacheUuid];
+                                        shaders[0].dispose();
+                                        shaders[1].dispose();
+                                        delete self.shaders[cacheUuid];
+                                    }
+                                }
+                                // Setup work for cache entries that are being added
+                                for (cacheUuid in newDrawingCache) {
+                                    if (newDrawingCache.hasOwnProperty(cacheUuid)) {
+                                        if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
+                                            continue;
+                                        }
+                                        var ce = newDrawingCache[cacheUuid];
+                                        ce.inPrimaryCache = true;
+                                        if (!ce.hasOwnProperty("graph")) {
+                                            cacheDrawing(ce);
+                                        }
+                                        
+                                        if (self.drawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry
+                                            shaders = self.shaders[cacheUuid];
+                                        } else {
+                                            shaders = Cache.makeShaders();
+                                            self.shaders[cacheUuid] = shaders;
+                                        }
+                                        var shader = shaders[0];
+                                        var rangeshader = shaders[1];
+                                        shader.attributes.normalVector.value = ce.cached_drawing.normals;
+                                        shader.attributes.timeNanos.value = ce.cached_drawing.timeNanos;
+                                        rangeshader.attributes.timeNanos.value = ce.cached_drawing.rangeTimeNanos;
+                                        shader.attributes.normalVector.needsUpdate = true;
+                                        shader.attributes.timeNanos.needsUpdate = true;
+                                        rangeshader.attributes.timeNanos.needsUpdate = true;
                                     }
                                 }
                                 self.drawingCache = newDrawingCache; // replace the first layer of the cache
@@ -231,7 +266,7 @@ Plot.prototype.drawGraph3 = function () {
         var mesh;
         var plot = new THREE.Object3D();
         var cacheEntry;
-        var shader;
+        var shaders, shader;
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
@@ -243,8 +278,10 @@ Plot.prototype.drawGraph3 = function () {
                     cacheDrawing(cacheEntry);
                 }
                 
+                shaders = this.shaders[uuid];
+                
                 graph = cacheEntry.cached_drawing.rangegraph;
-                shader = cacheEntry.cached_drawing.rangeshader;
+                shader = shaders[1];
                 shader.uniforms.affineMatrix.value = affineMatrix;
                 shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
                 shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
@@ -261,7 +298,7 @@ Plot.prototype.drawGraph3 = function () {
                 
                 
                 graph = cacheEntry.cached_drawing.graph;
-                shader = cacheEntry.cached_drawing.shader;
+                shader = shaders[0];
                 shader.uniforms.affineMatrix.value = affineMatrix;
                 shader.uniforms.rot90Matrix.value = this.rotator90;
                 shader.uniforms.thickness.value = THICKNESS;

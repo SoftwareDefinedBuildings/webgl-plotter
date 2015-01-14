@@ -100,6 +100,11 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var thisRequestID = ++this.drawRequestID;
         var loRequestTime = roundTime(this.xAxis.domainLo.slice(0, 2));
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
+        
+        if (thisRequestID % 10 == 0) {
+            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 300000, 150000);
+        }
+        
         for (var i = 0; i < numstreams; i++) {
             currUUID = this.plotter.selectedStreams[i].uuid;
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {

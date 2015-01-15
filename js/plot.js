@@ -270,15 +270,21 @@ Plot.prototype.drawGraph3 = function () {
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
+        var dispSettings;
+        
         for (var uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 cacheEntry = this.drawingCache[uuid];
                 
                 shaders = this.shaders[uuid];
                 
+                dispSettings = this.plotter.streamSettings[uuid];
+                
                 graph = cacheEntry.cached_drawing.rangegraph;
                 shader = shaders[1];
                 shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.color.value = dispSettings.color;
+                shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
                 shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
                 shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                 shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
@@ -301,8 +307,9 @@ Plot.prototype.drawGraph3 = function () {
                 graph = cacheEntry.cached_drawing.graph;
                 shader = shaders[0];
                 shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.color.value = dispSettings.color;
                 shader.uniforms.rot90Matrix.value = this.rotator90;
-                shader.uniforms.thickness.value = THICKNESS;
+                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
                 shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
                 shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                 shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;

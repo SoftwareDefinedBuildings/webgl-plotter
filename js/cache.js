@@ -765,6 +765,7 @@ Cache.makeShaders = function () {
         var shader = new THREE.ShaderMaterial({
             uniforms: {
                 "affineMatrix": {type: 'm4'},
+                "color": {type: 'v3'},
                 "rot90Matrix": {type: 'm3'},
                 "thickness": {type: 'f'},
                 "yDomainLo": {type: 'f'},
@@ -794,15 +795,18 @@ Cache.makeShaders = function () {
                  } \
                  ",
             fragmentShader: "\
-                 void main() { \
-                     gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
-                 } \
-                 "
+                uniform vec3 color; \
+                void main() { \
+                    gl_FragColor = vec4(color, 1.0); \
+                } \
+                "
             });
         
         var rangeshader = new THREE.ShaderMaterial({
                 uniforms: {
                     "affineMatrix": {type: 'm4'},
+                    "color": {type: 'v3'},
+                    "alpha": {type: 'f'},
                     "yDomainLo": {type: 'f'},
                     "xDomainLo1000": {type: 'f'},
                     "xDomainLoMillis": {type: 'f'},
@@ -825,10 +829,12 @@ Cache.makeShaders = function () {
                      } \
                      ",
                 fragmentShader: "\
-                     void main() { \
-                         gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5); \
-                     } \
-                     "
+                    uniform vec3 color; \
+                    uniform float alpha; \
+                    void main() { \
+                        gl_FragColor = vec4(color, alpha); \
+                    } \
+                    "
                 });
                 
         rangeshader.transparent = true;

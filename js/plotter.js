@@ -106,7 +106,10 @@ function Plotter() {
         
     render(); // start rendering
     
-    this.selectedStreams = [{uuid: "abffcf07-9e17-404a-98c3-ea4d60042ff3"}]; // Until we have a working UI, we'll populate this manually.
+    // selectedStreams is an array containing the metadata of each stream in a list
+    this.selectedStreams = [{uuid: "abffcf07-9e17-404a-98c3-ea4d60042ff3"}, {uuid: "bd46f563-a6e1-4b93-9899-0faf8a70a1b3"}, {uuid: "4d6525a9-b8ad-48a4-ae98-b171562cf817"}]; // Until we have a working UI, we'll populate this manually.
+    // streamSettings is a hashmap from the UUID of a stream to the object containing its display settings
+    this.streamSettings = {"abffcf07-9e17-404a-98c3-ea4d60042ff3": {color: new THREE.Vector3(0.0, 0.0, 1.0), selected: true}, "bd46f563-a6e1-4b93-9899-0faf8a70a1b3": {color: new THREE.Vector3(1.0, 0.0, 0.0), selected: false}, "4d6525a9-b8ad-48a4-ae98-b171562cf817": {color: new THREE.Vector3(0.0, 0.5, 0.0), selected: false}};
     this.selectedStartTime = [1412189933000, 0];
     this.selectedEndTime = [1412504914000, 0];
 }

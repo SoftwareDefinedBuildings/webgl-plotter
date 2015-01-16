@@ -101,8 +101,8 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var loRequestTime = roundTime(this.xAxis.domainLo.slice(0, 2));
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
         
-        if (thisRequestID % 5 == 0) {
-            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
+        if (thisRequestID % 1 == 0) {
+            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50, 25);
         }
         
         for (var i = 0; i < numstreams; i++) {
@@ -130,7 +130,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         }
                                         cacheEntry = self.drawingCache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
-                                        if (!cacheEntry.inSecondaryCache && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                                        if ((!cacheEntry.inSecondaryCache || true) && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
                                             cacheEntry.freeDrawing();
                                         }
                                         if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
@@ -281,6 +281,12 @@ Plot.prototype.drawGraph3 = function () {
                 dispSettings = this.plotter.streamSettings[uuid];
                 
                 graph = cacheEntry.cached_drawing.rangegraph;
+                if (!graph.verticesNeedUpdate) {
+                    graph.vertices = [];
+                }
+                if (!graph.elementsNeedUpdate) {
+                    graph.faces = [];
+                }
                 shader = shaders[1];
                 shader.uniforms.affineMatrix.value = affineMatrix;
                 shader.uniforms.color.value = dispSettings.color;
@@ -305,6 +311,12 @@ Plot.prototype.drawGraph3 = function () {
                 
                 
                 graph = cacheEntry.cached_drawing.graph;
+                if (!graph.verticesNeedUpdate) {
+                    graph.vertices = [];
+                }
+                if (!graph.elementsNeedUpdate) {
+                    graph.faces = [];
+                }
                 shader = shaders[0];
                 shader.uniforms.affineMatrix.value = affineMatrix;
                 shader.uniforms.color.value = dispSettings.color;

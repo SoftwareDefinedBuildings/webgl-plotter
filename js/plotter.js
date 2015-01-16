@@ -93,7 +93,7 @@ function Plotter() {
     
     // all requests for external resources are done through the Requester
     //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
-	this.requester = new Requester('http://localhost:4523/', 'http://asylum.cs.berkeley.edu:9000/data/uuid/');
+	this.requester = new Requester('http://localhost:4523/', 'http://localhost:9000/data/uuid/');
         
     this.plot = new Plot(this, 2, 0.5, -100, 0);
         
@@ -107,11 +107,11 @@ function Plotter() {
     render(); // start rendering
     
     // selectedStreams is an array containing the metadata of each stream in a list
-    this.selectedStreams = [{uuid: "abffcf07-9e17-404a-98c3-ea4d60042ff3"}, {uuid: "bd46f563-a6e1-4b93-9899-0faf8a70a1b3"}, {uuid: "4d6525a9-b8ad-48a4-ae98-b171562cf817"}]; // Until we have a working UI, we'll populate this manually.
+    this.selectedStreams = [{uuid: "9f67541c-95ee-11e4-a7ac-0026b6df9cf2"}, {uuid: "221b154e-95de-11e4-bf98-0026b6df9cf2"}]; // Until we have a working UI, we'll populate this manually.
     // streamSettings is a hashmap from the UUID of a stream to the object containing its display settings
-    this.streamSettings = {"abffcf07-9e17-404a-98c3-ea4d60042ff3": {color: new THREE.Vector3(0.0, 0.0, 1.0), selected: true}, "bd46f563-a6e1-4b93-9899-0faf8a70a1b3": {color: new THREE.Vector3(1.0, 0.0, 0.0), selected: false}, "4d6525a9-b8ad-48a4-ae98-b171562cf817": {color: new THREE.Vector3(0.0, 0.5, 0.0), selected: false}};
-    this.selectedStartTime = [1412189933000, 0];
-    this.selectedEndTime = [1412504914000, 0];
+    this.streamSettings = {"9f67541c-95ee-11e4-a7ac-0026b6df9cf2": {color: new THREE.Vector3(0.0, 0.0, 1.0), selected: true}, "221b154e-95de-11e4-bf98-0026b6df9cf2": {color: new THREE.Vector3(1.0, 0.0, 0.0), selected: false}};
+    this.selectedStartTime = [1420553456000, 0];
+    this.selectedEndTime = [1421676656000, 0];
 }
 
 Plotter.prototype.updateScreenSize = function () {

@@ -32,6 +32,9 @@ function Cache (requester) {
     this.requester = requester;
 }
 
+Cache.facePool = new FacePool();
+Cache.zNormal = new THREE.Vector3(0, 0, 1);
+
 /* The start time and end time are two-element arrays. */
 function CacheEntry(startTime, endTime, data) {
     this.start_time = startTime;
@@ -55,6 +58,9 @@ CacheEntry.prototype.freeDrawing = function () {
         this.cached_drawing.rangegraph.dispose();
         delete this.cached_drawing.graph;
         delete this.cached_drawing.rangegraph;
+        delete this.cached_drawing.normals;
+        delete this.cached_drawing.timeNanos;
+        delete this.cached_drawing.rangeTimeNanos;
     };
     
 CacheEntry.prototype.removeFromSecCache = function () {
@@ -113,8 +119,7 @@ Cache.prototype.validateLoaded = function () {
                 }
             }
         }
-        console.log(total);
-        console.log(this.loadedData);
+        console.log(total + " " + this.loadedData);
         return total == this.loadedData;
     };
 
@@ -380,6 +385,18 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
                 n++;
             }
         }
+        
+        var entryLength;
+        var loadedStreams = this.loadedStreams;
+        for (var k = i; k <= j; k++) {
+            // Update the amount of data has been loaded into the cache
+            entryLength = cache[k].getLength();
+            this.loadedData -= entryLength;
+            loadedStreams[uuid] -= entryLength;
+            // Dispose of the geometries to avoid leaking memory
+            cache[k].removeFromSecCache();
+        }
+        
         var cacheEntry;
         if (m == n) {
             if (dataBefore.length > 0) {
@@ -389,17 +406,6 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
             }
         } else {
             cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, [data.slice(m, n)]), dataAfter));
-        }
-        var loadedStreams = this.loadedStreams;
-        var entryLength;
-        for (var k = i; k <= j; k++) {
-            // Update the amount of data has been loaded into the cache
-            entryLength = cache[k].getLength();
-            this.loadedData -= entryLength;
-            loadedStreams[uuid] -= entryLength;
-            
-            // Dispose of the geometries to avoid leaking memory
-            cache[k].removeFromSecCache();
         }
         entryLength = cacheEntry.getLength(); // Perhaps we could optimize this? Probably not necessary though.
         this.loadedData += entryLength;
@@ -648,26 +654,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
             }
         }
         
-        // Delete all but displayed data, if deleting streams, pointwidths, and cache entries was not enough
-        for (i = 0; i < streams.length; i++) {
-            pwdata = dataCache[streams[i].uuid][currPWE][0].cached_data;
-            this.loadedData -= pwdata.length;
-            loadedStreams[streams[i].uuid] -= pwdata.length; // this should be 0 now
-            j = binSearchCmp(pwdata, startTime, cmpTimes);
-            k = binSearchCmp(pwdata, endTime, cmpTimes);
-            if (cmpTimes(pwdata[j], startTime) >= 0 && j > 0) {
-                j--;
-            }
-            if (cmpTimes(pwdata[k], endTime) <= 0 && k < pwdata.length - 1) {
-                k++;
-            }
-            dataCache[streams[i].uuid][currPWE][0].removeFromSecCache();
-            dataCache[streams[i].uuid][currPWE][0] = new CacheEntry([pwdata[j][0], pwdata[j][1]], [pwdata[k][0], pwdata[k][1]], pwdata.slice(j, k));
-            loadedStreams[streams[i].uuid] += (k - j);
-            this.loadedData += (k - j);
-        }
-        
-        // If target is still less than loadedData, it means that target isn't big enough to accomodate the data that needs to be displayed on the screen
+        // If target is still less than loadedData, it means that target isn't big enough to accomodate the current cache entry
         return true;
     };
  
@@ -716,8 +703,8 @@ CacheEntry.prototype.cacheDrawing = function () {
                 pointID += 6;*/
                 
                 if (i == 0 && k == 0) {
-                    normals.push(new THREE.Vector3(0, 0, 1));
-                    normals.push(new THREE.Vector3(0, 0, 1));
+                    normals.push(Cache.zNormal);
+                    normals.push(Cache.zNormal);
                 } else {
                     tempTime = subTimes(data[k][i].slice(0, 2), data[prevK][prevI]);
                     normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - data[prevK][prevI][3], 0);
@@ -727,19 +714,9 @@ CacheEntry.prototype.cacheDrawing = function () {
                     normals.push(normal);
                     normals.push(normals[vertexID - 5]);
                     normals[vertexID - 5].negate();
-
-                    // It seems that faces only show up if you traverse their vertices counterclockwise
-                    graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-                    graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
-                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
                     
-                    /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
-                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
-                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-                    points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
-                    
-                    rangegraph.faces.push(new THREE.Face3(rangeVertexID - 1, rangeVertexID - 3, rangeVertexID - 4));
+                    // Maybe we could optimize these faces as well, but we'll hold off for now since we may change how we do the background
+                    rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
                     rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
                 }
                 prevI = i;
@@ -747,12 +724,14 @@ CacheEntry.prototype.cacheDrawing = function () {
             }
         }
         
+        Cache.facePool.fillArr(graph.faces, 8, vertexID);
+        
         graph.verticesNeedUpdate = true;
         graph.elementsNeedUpdate = true;
         rangegraph.verticesNeedUpdate = true;
         rangegraph.elementsNeedUpdate = true;
-        normals.push(new THREE.Vector3(0, 0, 1));
-        normals.push(new THREE.Vector3(0, 0, 1));
+        normals.push(Cache.zNormal);
+        normals.push(Cache.zNormal);
         
         cacheEntry.cached_drawing.graph = graph;
         cacheEntry.cached_drawing.rangegraph = rangegraph;
@@ -840,4 +819,40 @@ Cache.makeShaders = function () {
         rangeshader.transparent = true;
                 
         return [shader, rangeshader];
+    };
+    
+function FacePool() {
+    this.faces = [true, true, true, true, true, true, true, true];
+}
+
+FacePool.prototype.fillArr = function (arr, vStart, vEnd) {
+        var i = vStart;
+        if (vEnd < this.faces.length) {
+            while (i < vEnd) {
+                arr.push(this.faces[i]);
+                arr.push(this.faces[i + 1]);
+                arr.push(this.faces[i + 2]);
+                arr.push(this.faces[i + 3]);
+                i += 4;
+            }
+            return;
+        }
+        while (i < this.faces.length) {
+            arr.push(this.faces[i]);
+            arr.push(this.faces[i + 1]);
+            arr.push(this.faces[i + 2]);
+            arr.push(this.faces[i + 3]);
+            i += 4;
+        }
+        while (i < vEnd) {
+            this.faces.push(new THREE.Face3(i - 6, i - 5, i - 4));
+            this.faces.push(new THREE.Face3(i - 4, i - 5, i - 3));
+            this.faces.push(new THREE.Face3(i - 8, i - 7, i - 6));
+            this.faces.push(new THREE.Face3(i - 8, i - 5, i - 7));
+            arr.push(this.faces[i]);
+            arr.push(this.faces[i + 1]);
+            arr.push(this.faces[i + 2]);
+            arr.push(this.faces[i + 3]);
+            i += 4;
+        }
     };

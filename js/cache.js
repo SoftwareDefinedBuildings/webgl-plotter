@@ -53,6 +53,23 @@ CacheEntry.prototype.getLength = function () {
         return length;
     };
     
+CacheEntry.prototype.compressIfPossible = function () {
+        var graph = this.cached_drawing.graph;
+        var rangegraph = this.cached_drawing.rangegraph;
+        if (graph.vertices.length > 0 && !graph.verticesNeedUpdate) {
+            graph.vertices = [];
+        }
+        if (graph.faces.length > 0 && !graph.elementsNeedUpdate) {
+            graph.faces = [];
+        }
+        if (rangegraph.vertices.length > 0 && !rangegraph.verticesNeedUpdate) {
+            rangegraph.vertices = [];
+        }
+        if (rangegraph.faces.length > 0 && !rangegraph.elementsNeedUpdate) {
+            rangegraph.faces = [];
+        }
+    };
+    
 CacheEntry.prototype.freeDrawing = function () {
         this.cached_drawing.graph.dispose();
         this.cached_drawing.rangegraph.dispose();
@@ -659,7 +676,10 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
     };
  
 /** Create a geometry and shader so that the data can be drawn quickly. */   
-CacheEntry.prototype.cacheDrawing = function () {
+CacheEntry.prototype.cacheDrawing = function (facePool) {
+        if (facePool == undefined) {
+            facePool = new FacePool();
+        }
         var cacheEntry = this;
         var graph = new THREE.Geometry();
         var rangegraph = new THREE.Geometry();
@@ -715,6 +735,12 @@ CacheEntry.prototype.cacheDrawing = function () {
                     normals.push(normals[vertexID - 5]);
                     normals[vertexID - 5].negate();
                     
+                    /*// It seems that faces only show up if you traverse their vertices counterclockwise
+                    graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                    graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));*/
+                    
                     // Maybe we could optimize these faces as well, but we'll hold off for now since we may change how we do the background
                     rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
                     rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
@@ -724,7 +750,7 @@ CacheEntry.prototype.cacheDrawing = function () {
             }
         }
         
-        Cache.facePool.fillArr(graph.faces, 8, vertexID);
+        facePool.fillArr(graph.faces, 8, vertexID);
         
         graph.verticesNeedUpdate = true;
         graph.elementsNeedUpdate = true;

@@ -708,25 +708,28 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         var gapThreshold = expToPW(pwe);
         var gap;
         var prevCount;
+        var endPrevInt;
         prevPt = [cacheEntry.start_time[0], cacheEntry.start_time[1], 0, 0, 0, 0];
         var prevPrevPt;
         
         for (k = 0; k < data.length; k++) {
             for (i = 0; i < data[k].length; i++) {
+                pt = data[k][i];
+                
                 // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
-                vertexVect = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][3], data[k][i][0] % 1000000);
+                vertexVect = new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[3], pt[0] % 1000000);
                 
                 for (j = 0; j < 4; j++) {
                     // These are reference copies, but that's OK since it gets sent to the vertex shader
                     graph.vertices.push(vertexVect);
-                    timeNanos.push(data[k][i][1]);
+                    timeNanos.push(pt[1]);
                 }
                 
-                rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][2], data[k][i][0] % 1000000));
-                rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][4], data[k][i][0] % 1000000));
+                rangegraph.vertices.push(new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[2], pt[0] % 1000000));
+                rangegraph.vertices.push(new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[4], pt[0] % 1000000));
                 
-                rangeTimeNanos.push(data[k][i][1]);
-                rangeTimeNanos.push(data[k][i][1]);
+                rangeTimeNanos.push(pt[1]);
+                rangeTimeNanos.push(pt[1]);
                 
                 rangeVertexID += 2;
                 
@@ -741,17 +744,17 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                 
                 pointID += 6;*/
                 
-                gap = cmpTimes(subTimes(data[k][i].slice(0, 2), prevPt), gapThreshold) > 0;
+                gap = cmpTimes(subTimes(pt.slice(0, 2), prevPt), gapThreshold) > 0;
                 
                 if (i == 0 && k == 0) {
                     normals.push(Cache.zNormal);
                     normals.push(Cache.zNormal);
                     if (gap) {
-                        ddplotVertexID = addDDSeg(data[k][i], prevPt, null, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                        ddplotVertexID = addDDSeg(pt, prevPt, null, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
                     }
                 } else {
-                    tempTime = subTimes(data[k][i].slice(0, 2), prevPt);
-                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - prevPt[3], 0);
+                    tempTime = subTimes(pt.slice(0, 2), prevPt);
+                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], pt[3] - prevPt[3], 0);
                     // Again, reference copies are OK because it gets sent to the vertex shader
                     normals.push(normal);
                     normals.push(normal.clone());
@@ -784,21 +787,34 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     ddplotMax = Math.max(prevPt[5], ddplotMax);
                     if (gap) {
                         // We ought to zero the ddplot for the appropriate time interval
-                        var endPrevInt = addTimes([prevPt[0], prevPt[1], 0, 0, 0, 0], gapThreshold);
+                        endPrevInt = addTimes([prevPt[0], prevPt[1], 0, 0, 0, 0], gapThreshold);
                         ddplotVertexID = addDDSeg(endPrevInt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
-                        prevPt = endPrevInt;
                         prevPrevPt = prevPt;
+                        prevPt = endPrevInt;
                     }
-                    ddplotVertexID = addDDSeg(data[k][i], prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                    ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
                 }
                 
                 prevPrevPt = prevPt
-                prevPt = data[k][i];
+                prevPt = pt;
                 prevI = i;
                 prevK = k;
                 prevGap = gap;
             }
         }
+        
+        // Deal with last point for data density plot
+        pt = [cacheEntry.end_time[0], cacheEntry.end_time[1], 0, 0, 0, 0];
+        gap = cmpTimes(subTimes(pt.slice(0, 2), prevPt), gapThreshold) > 0;
+        ddplotMax = Math.max(prevPt[5], ddplotMax);
+        if (gap) {
+            // We ought to zero the ddplot for the appropriate time interval
+            endPrevInt = addTimes([prevPt[0], prevPt[1], 0, 0, 0, 0], gapThreshold);
+            ddplotVertexID = addDDSeg(endPrevInt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+            prevPrevPt = prevPt;
+            prevPt = endPrevInt;
+        }
+        ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
         
         graph.verticesNeedUpdate = true;
         graph.elementsNeedUpdate = true;

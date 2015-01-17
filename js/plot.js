@@ -144,7 +144,6 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                     }
                                 }
                                 // Setup work for cache entries that are being added
-                                var fp = new FacePool();
                                 for (cacheUuid in newDrawingCache) {
                                     if (newDrawingCache.hasOwnProperty(cacheUuid)) {
                                         if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
@@ -153,7 +152,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         var ce = newDrawingCache[cacheUuid];
                                         ce.inPrimaryCache = true;
                                         if (!ce.hasOwnProperty("graph")) {
-                                            ce.cacheDrawing(fp);
+                                            ce.cacheDrawing(self.pwe);
                                         }
                                         
                                         if (self.drawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry

@@ -683,10 +683,7 @@ CacheEntry.rightDir = new THREE.Vector3(1, 0, 0);
 CacheEntry.topDir = new THREE.Vector3(0, 1, 0);
 CacheEntry.bottomDir = new THREE.Vector3(0, -1, 0);
 /** Create a geometry and shader so that the data can be drawn quickly. */   
-CacheEntry.prototype.cacheDrawing = function (facePool) {
-        if (facePool == undefined) {
-            facePool = new FacePool();
-        }
+CacheEntry.prototype.cacheDrawing = function (pwe) {
         var cacheEntry = this;
         var graph = new THREE.Geometry();
         var rangegraph = new THREE.Geometry();
@@ -703,9 +700,16 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
         var ddplotNanos = [];
         var ddplotnormals = [];
         var shader, rangeShader;
-        var ddplotMax = -Infinity;
+        var ddplotMax = 0;
         var i, j, k;
         var prevI, prevK;
+        var pt, prevPt;
+        var prevGap = false;
+        var gapThreshold = expToPW(pwe);
+        var gap;
+        var prevCount;
+        prevPt = [cacheEntry.start_time[0], cacheEntry.start_time[1], 0, 0, 0, 0];
+        var prevPrevPt;
         for (k = 0; k < data.length; k++) {
             for (i = 0; i < data[k].length; i++) {
                 // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
@@ -740,8 +744,9 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
                     normals.push(Cache.zNormal);
                     normals.push(Cache.zNormal);
                 } else {
-                    tempTime = subTimes(data[k][i].slice(0, 2), data[prevK][prevI]);
-                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - data[prevK][prevI][3], 0);
+                    gap = cmpTimes(subTimes(data[k][i].slice(0, 2), prevPt), gapThreshold) > 0;
+                    tempTime = subTimes(data[k][i].slice(0, 2), prevPt);
+                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - prevPt[3], 0);
                     // Again, reference copies are OK because it gets sent to the vertex shader
                     normals.push(normal);
                     normals.push(normal.clone());
@@ -749,54 +754,46 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
                     normals.push(normals[vertexID - 5]);
                     normals[vertexID - 5].negate();
                     
-                    /*// It seems that faces only show up if you traverse their vertices counterclockwise
-                    graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-                    graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
-                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));*/
-                    
-                    // Maybe we could optimize these faces as well, but we'll hold off for now since we may change how we do the background
-                    rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
-                    rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
-                    
-                    ddplotVertex = new THREE.Vector3(Math.floor(data[prevK][prevI][0] / 1000000), data[k][i][5], data[prevK][prevI][0] % 1000000);
-                    for (j = 0; j < 4; j++) {
-                        ddplot.vertices.push(ddplotVertex);
-                        ddplotNanos.push(data[prevK][prevI][1]);
-                    }
-                    ddplotnormals.push(CacheEntry.topDir);
-                    ddplotnormals.push(CacheEntry.bottomDir);
-                    ddplotnormals.push(CacheEntry.leftDir);
-                    ddplotnormals.push(CacheEntry.rightDir);
-                    ddplotVertex = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][5], data[k][i][0] % 1000000);
-                    ddplotMax = Math.max(data[k][i][5], ddplotMax);
-                    for (j = 0; j < 4; j++) {
-                        ddplot.vertices.push(ddplotVertex);
-                        ddplotNanos.push(data[k][i][1]);
-                    }
-                    ddplotnormals.push(CacheEntry.topDir);
-                    ddplotnormals.push(CacheEntry.bottomDir);
-                    ddplotnormals.push(CacheEntry.leftDir);
-                    ddplotnormals.push(CacheEntry.rightDir);
-                    ddplotVertexID += 8;
-                    if (ddplotVertexID >= 12) {
-                        if (data[k][i][5] > data[prevK][prevI][5]) {
-                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 10, ddplotVertexID - 5));
-                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 9, ddplotVertexID - 5));
-                        } else if (data[k][i][5] < data[prevK][prevI][5]) {
-                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 5, ddplotVertexID - 10));
-                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 5, ddplotVertexID - 9));
+                    // It seems that faces only show up if you traverse their vertices counterclockwise
+                    if (gap) {
+                        if (prevGap) {
+                            normals[vertexID - 8] = CacheEntry.topDir;
+                            normals[vertexID - 7] = CacheEntry.bottomDir;
+                            normals[vertexID - 6] = CacheEntry.rightDir;
+                            normals[vertexID - 5] = CacheEntry.leftDir;
                         }
+                    } else {
+                        graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                        graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
                     }
-                    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 7, ddplotVertexID - 4));
-                    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 7, ddplotVertexID - 3, ddplotVertexID - 4));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
+                    
+                    if (gap) {
+                        // We'll have to perturb things a bit to get a visibly thick vertical line
+                    } else {
+                        rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
+                        rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                    }
+                    
+                    ddplotMax = Math.max(prevPt[5], ddplotMax);
+                    if (gap) {
+                        // We ought to zero the ddplot for the appropriate time interval
+                        var endPrevInt = addTimes([prevPt[0], prevPt[1], 0, 0, 0, 0], gapThreshold);
+                        ddplotVertexID = addDDSeg(endPrevInt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                        prevPt = endPrevInt;
+                        prevPrevPt = prevPt;
+                    }
+                    ddplotVertexID = addDDSeg(data[k][i], prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
                 }
+                
+                prevPrevPt = prevPt
+                prevPt = data[k][i];
                 prevI = i;
                 prevK = k;
+                prevGap = gap;
             }
         }
-        
-        facePool.fillArr(graph.faces, 8, vertexID);
         
         graph.verticesNeedUpdate = true;
         graph.elementsNeedUpdate = true;
@@ -817,6 +814,42 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
         cacheEntry.cached_drawing.ddplotNanos = ddplotNanos;
         cacheEntry.cached_drawing.ddplotMax = ddplotMax;
     };
+    
+function addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID) {
+    var j;
+    ddplotVertex = new THREE.Vector3(Math.floor(prevPt[0] / 1000000), prevPt[5], prevPt[0] % 1000000);
+    for (j = 0; j < 4; j++) {
+        ddplot.vertices.push(ddplotVertex);
+        ddplotNanos.push(prevPt[1]);
+    }
+    ddplotnormals.push(CacheEntry.topDir);
+    ddplotnormals.push(CacheEntry.bottomDir);
+    ddplotnormals.push(CacheEntry.leftDir);
+    ddplotnormals.push(CacheEntry.rightDir);
+    ddplotVertex = new THREE.Vector3(Math.floor(pt[0] / 1000000), prevPt[5], pt[0] % 1000000);
+    for (j = 0; j < 4; j++) {
+        ddplot.vertices.push(ddplotVertex);
+        ddplotNanos.push(pt[1]);
+    }
+    ddplotnormals.push(CacheEntry.topDir);
+    ddplotnormals.push(CacheEntry.bottomDir);
+    ddplotnormals.push(CacheEntry.leftDir);
+    ddplotnormals.push(CacheEntry.rightDir);
+    ddplotVertexID += 8;
+    if (ddplotVertexID >= 12) {
+        if (prevPt[5] > prevPrevPt[5]) {
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 10, ddplotVertexID - 5));
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 9, ddplotVertexID - 5));
+        } else if (prevPt[5] < prevPrevPt[5]) {
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 5, ddplotVertexID - 10));
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 5, ddplotVertexID - 9));
+        }
+    }
+    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 7, ddplotVertexID - 4));
+    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 7, ddplotVertexID - 3, ddplotVertexID - 4));
+    
+    return ddplotVertexID;
+}
 
 Cache.makeShaders = function () {
         var shader = new THREE.ShaderMaterial({

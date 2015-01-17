@@ -32,7 +32,6 @@ function Cache (requester) {
     this.requester = requester;
 }
 
-Cache.facePool = new FacePool();
 Cache.zNormal = new THREE.Vector3(0, 0, 1);
 
 /* The start time and end time are two-element arrays. */
@@ -56,6 +55,7 @@ CacheEntry.prototype.getLength = function () {
 CacheEntry.prototype.compressIfPossible = function () {
         var graph = this.cached_drawing.graph;
         var rangegraph = this.cached_drawing.rangegraph;
+        var ddplot = this.cached_drawing.ddplot;
         if (graph.vertices.length > 0 && !graph.verticesNeedUpdate) {
             graph.vertices = [];
         }
@@ -68,16 +68,19 @@ CacheEntry.prototype.compressIfPossible = function () {
         if (rangegraph.faces.length > 0 && !rangegraph.elementsNeedUpdate) {
             rangegraph.faces = [];
         }
+        if (ddplot.vertices.length > 0 && !ddplot.verticesNeedUpdate) {
+            ddplot.vertices = [];
+        }
+        if (ddplot.faces.length > 0 && !ddplot.elementsNeedUpdate) {
+            ddplot.faces = [];
+        }
     };
     
 CacheEntry.prototype.freeDrawing = function () {
         this.cached_drawing.graph.dispose();
         this.cached_drawing.rangegraph.dispose();
-        delete this.cached_drawing.graph;
-        delete this.cached_drawing.rangegraph;
-        delete this.cached_drawing.normals;
-        delete this.cached_drawing.timeNanos;
-        delete this.cached_drawing.rangeTimeNanos;
+        this.cached_drawing.ddplot.dispose();
+        this.cached_drawing = {};
     };
     
 CacheEntry.prototype.removeFromSecCache = function () {
@@ -675,6 +678,10 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         return true;
     };
  
+CacheEntry.leftDir = new THREE.Vector3(-1, 0, 0);
+CacheEntry.rightDir = new THREE.Vector3(1, 0, 0);
+CacheEntry.topDir = new THREE.Vector3(0, 1, 0);
+CacheEntry.bottomDir = new THREE.Vector3(0, -1, 0);
 /** Create a geometry and shader so that the data can be drawn quickly. */   
 CacheEntry.prototype.cacheDrawing = function (facePool) {
         if (facePool == undefined) {
@@ -683,14 +690,20 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
         var cacheEntry = this;
         var graph = new THREE.Geometry();
         var rangegraph = new THREE.Geometry();
+        var ddplot = new THREE.Geometry();
         var data = cacheEntry.cached_data;
         var vertexID = 0;
         var rangeVertexID = 0;
+        var ddplotVertexID = 0;
         var vertexVect;
+        var ddplotVertex;
         var timeNanos = [];
         var normals = [];
         var rangeTimeNanos = [];
+        var ddplotNanos = [];
+        var ddplotnormals = [];
         var shader, rangeShader;
+        var ddplotMax = -Infinity;
         var i, j, k;
         var prevI, prevK;
         for (k = 0; k < data.length; k++) {
@@ -713,6 +726,7 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
                 rangeVertexID += 2;
                 
                 vertexID += 4;
+                
                 
                 /*for (j = 0; j < 6; j++) {
                     pvect = new THREE.Vector3(x, y, 0);
@@ -744,6 +758,38 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
                     // Maybe we could optimize these faces as well, but we'll hold off for now since we may change how we do the background
                     rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
                     rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                    
+                    ddplotVertex = new THREE.Vector3(Math.floor(data[prevK][prevI][0] / 1000000), data[k][i][5], data[prevK][prevI][0] % 1000000);
+                    for (j = 0; j < 4; j++) {
+                        ddplot.vertices.push(ddplotVertex);
+                        ddplotNanos.push(data[prevK][prevI][1]);
+                    }
+                    ddplotnormals.push(CacheEntry.topDir);
+                    ddplotnormals.push(CacheEntry.bottomDir);
+                    ddplotnormals.push(CacheEntry.leftDir);
+                    ddplotnormals.push(CacheEntry.rightDir);
+                    ddplotVertex = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][5], data[k][i][0] % 1000000);
+                    ddplotMax = Math.max(data[k][i][5], ddplotMax);
+                    for (j = 0; j < 4; j++) {
+                        ddplot.vertices.push(ddplotVertex);
+                        ddplotNanos.push(data[k][i][1]);
+                    }
+                    ddplotnormals.push(CacheEntry.topDir);
+                    ddplotnormals.push(CacheEntry.bottomDir);
+                    ddplotnormals.push(CacheEntry.leftDir);
+                    ddplotnormals.push(CacheEntry.rightDir);
+                    ddplotVertexID += 8;
+                    if (ddplotVertexID >= 12) {
+                        if (data[k][i][5] > data[prevK][prevI][5]) {
+                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 10, ddplotVertexID - 5));
+                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 9, ddplotVertexID - 5));
+                        } else if (data[k][i][5] < data[prevK][prevI][5]) {
+                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 5, ddplotVertexID - 10));
+                            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 5, ddplotVertexID - 9));
+                        }
+                    }
+                    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 7, ddplotVertexID - 4));
+                    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 7, ddplotVertexID - 3, ddplotVertexID - 4));
                 }
                 prevI = i;
                 prevK = k;
@@ -756,14 +802,20 @@ CacheEntry.prototype.cacheDrawing = function (facePool) {
         graph.elementsNeedUpdate = true;
         rangegraph.verticesNeedUpdate = true;
         rangegraph.elementsNeedUpdate = true;
+        ddplot.verticesNeedUpdate = true;
+        ddplot.elementsNeedUpdate = true;
         normals.push(Cache.zNormal);
         normals.push(Cache.zNormal);
         
         cacheEntry.cached_drawing.graph = graph;
         cacheEntry.cached_drawing.rangegraph = rangegraph;
+        cacheEntry.cached_drawing.ddplot = ddplot
         cacheEntry.cached_drawing.normals = normals;
         cacheEntry.cached_drawing.timeNanos = timeNanos;
         cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;
+        cacheEntry.cached_drawing.ddplotnormals = ddplotnormals;
+        cacheEntry.cached_drawing.ddplotNanos = ddplotNanos;
+        cacheEntry.cached_drawing.ddplotMax = ddplotMax;
     };
 
 Cache.makeShaders = function () {
@@ -843,8 +895,46 @@ Cache.makeShaders = function () {
                 });
                 
         rangeshader.transparent = true;
+        
+        var ddplotshader = new THREE.ShaderMaterial({
+            uniforms: {
+                "affineMatrix": {type: 'm4'},
+                "color": {type: 'v3'},
+                "thickness": {type: 'f'},
+                "yDomainLo": {type: 'f'},
+                "xDomainLo1000": {type: 'f'},
+                "xDomainLoMillis": {type: 'f'},
+                "xDomainLoNanos": {type: 'f'}
+                },
+            attributes: {
+                "normalVector": {type: 'v3'},
+                "timeNanos": {type: 'f'}
+                },
+            vertexShader: " \
+                uniform mat4 affineMatrix; \
+                uniform float thickness; \
+                uniform float yDomainLo; \
+                uniform float xDomainLo1000; \
+                uniform float xDomainLoMillis; \
+                uniform float xDomainLoNanos; \
+                attribute vec3 normalVector; \
+                attribute float timeNanos; \
+                void main() { \
+                    float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
+                    vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
+                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(mat3(affineMatrix) * normalVector), 0.0); \
+                    gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
+                 } \
+                 ",
+            fragmentShader: "\
+                uniform vec3 color; \
+                void main() { \
+                    gl_FragColor = vec4(color, 1.0); \
+                } \
+                "
+            });
                 
-        return [shader, rangeshader];
+        return [shader, rangeshader, ddplotshader];
     };
     
 function FacePool() {

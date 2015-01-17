@@ -164,12 +164,17 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         }
                                         var shader = shaders[0];
                                         var rangeshader = shaders[1];
+                                        var ddshader = shaders[2];
                                         shader.attributes.normalVector.value = ce.cached_drawing.normals;
                                         shader.attributes.timeNanos.value = ce.cached_drawing.timeNanos;
                                         rangeshader.attributes.timeNanos.value = ce.cached_drawing.rangeTimeNanos;
+                                        ddshader.attributes.normalVector.value = ce.cached_drawing.ddplotnormals;
+                                        ddshader.attributes.timeNanos.value = ce.cached_drawing.ddplotNanos;
                                         shader.attributes.normalVector.needsUpdate = true;
                                         shader.attributes.timeNanos.needsUpdate = true;
                                         rangeshader.attributes.timeNanos.needsUpdate = true;
+                                        ddshader.attributes.normalVector.needsUpdate = true;
+                                        ddshader.attributes.timeNanos.needsUpdate = true;
                                     }
                                 }
                                 fp = null;
@@ -241,12 +246,12 @@ Plot.prototype.drawGraph2 = function () {
                 data = this.drawingCache[uuid].cached_data;
                 for (k = 0; k < data.length; k++) {
                     for (i = 0; i < data[k].length; i++) {
-		        if (data[k][i][2] < minval) {
-		            minval = data[k][i][2];
-		        }
-		        if (data[k][i][4] > maxval) {
-		            maxval = data[k][i][4];
-		        }
+		                if (data[k][i][2] < minval) {
+		                    minval = data[k][i][2];
+		                }
+		                if (data[k][i][4] > maxval) {
+		                    maxval = data[k][i][4];
+		                }
                     }
                 }
             }
@@ -275,7 +280,21 @@ Plot.prototype.drawGraph3 = function () {
         
         var dispSettings;
         
-        for (var uuid in this.drawingCache) {
+        var uuid;
+        
+        var ddPlotMax = -Infinity;
+        
+        for (uuid in this.drawingCache) {
+            if (this.drawingCache.hasOwnProperty(uuid)) {
+                ddPlotMax = Math.max(ddPlotMax, this.drawingCache[uuid].cached_drawing.ddplotMax);
+            }
+        }
+        
+        var ddAxis = new Axis(0, ddPlotMax, this.plotspGeom.vertices[3].y + 2, this.plotspGeom.vertices[3].y + 18);
+        
+        var ddMatrix = getAffineTransformMatrix(this.xAxis, ddAxis);
+        
+        for (uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
                 cacheEntry = this.drawingCache[uuid];
                 cacheEntry.compressIfPossible();
@@ -307,7 +326,6 @@ Plot.prototype.drawGraph3 = function () {
                 mesh.geometry = graph;
                 mesh.material = shader;
                 
-                
                 graph = cacheEntry.cached_drawing.graph;
                 shader = shaders[0];
                 shader.uniforms.affineMatrix.value = affineMatrix;
@@ -331,6 +349,29 @@ Plot.prototype.drawGraph3 = function () {
                 
                 mesh.geometry = graph;
                 mesh.material = shader;                
+                
+                graph = cacheEntry.cached_drawing.ddplot;
+                shader = shaders[2];
+                shader.uniforms.affineMatrix.value = ddMatrix;
+                shader.uniforms.color.value = dispSettings.color;
+                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
+                shader.uniforms.yDomainLo.value = ddAxis.domainLo;
+                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                
+                if (meshNum < this.plot.children.length) {
+                    mesh = this.plot.children[meshNum];
+                } else {
+                    mesh = new THREE.Mesh();
+                    mesh.frustumCulled = false;
+                    this.plot.add(mesh);
+                }
+                
+                meshNum++;
+                
+                mesh.geometry = graph;
+                mesh.material = shader;    
             }
         }
         for (var i = this.plot.children.length - 1; i >= meshNum; i++) {

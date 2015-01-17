@@ -710,6 +710,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         var prevCount;
         prevPt = [cacheEntry.start_time[0], cacheEntry.start_time[1], 0, 0, 0, 0];
         var prevPrevPt;
+        
         for (k = 0; k < data.length; k++) {
             for (i = 0; i < data[k].length; i++) {
                 // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
@@ -740,11 +741,15 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                 
                 pointID += 6;*/
                 
+                gap = cmpTimes(subTimes(data[k][i].slice(0, 2), prevPt), gapThreshold) > 0;
+                
                 if (i == 0 && k == 0) {
                     normals.push(Cache.zNormal);
                     normals.push(Cache.zNormal);
+                    if (gap) {
+                        ddplotVertexID = addDDSeg(data[k][i], prevPt, null, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                    }
                 } else {
-                    gap = cmpTimes(subTimes(data[k][i].slice(0, 2), prevPt), gapThreshold) > 0;
                     tempTime = subTimes(data[k][i].slice(0, 2), prevPt);
                     normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - prevPt[3], 0);
                     // Again, reference copies are OK because it gets sent to the vertex shader
@@ -770,7 +775,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
                     
                     if (gap) {
-                        // We'll have to perturb things a bit to get a visibly thick vertical line
+                        // TODO We'll have to perturb things a bit to get a visibly thick vertical line
                     } else {
                         rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
                         rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));

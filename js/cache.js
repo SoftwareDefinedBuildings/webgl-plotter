@@ -176,21 +176,38 @@ function validateContiguous(cacheEntry, pwe) {
    */
 Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
-        var halfPW = expToPW(pointwidthexp - 1);
+        
+        var queryStart = startTime;
+        var queryEnd = endTime;
+        
+        var halfpwnanos = expToPW(pointwidthexp - 1);
+        
+        /* queryStart and queryEnd are the start and end of the query I want,
+        in terms of the midpoints of the intervals I get back; the real archiver
+        will give me back all intervals that touch the query range. So I shrink
+        the range by half a pointwidth on each side to compensate for that. */
+        if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
+            halfpwnanos = [0, 0];
+        }
+        var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
+        var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
+        
+        if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
+            trueEnd[0] = trueStart[0];
+            trueEnd[1] = trueStart[1];
+            subTimes(trueStart, [0, 1]);
+        }
+        
         var startlow = [this.queryLow[0], this.queryLow[1]];
         var endlow = [this.queryLow[0], this.queryLow[1]];
         var starthigh = [this.queryHigh[0], this.queryHigh[1]];
         var endhigh = [this.queryHigh[0], this.queryHigh[1]];
         
-        addTimes(startlow, halfPW);
-        addTimes(endlow, halfPW);
         addTimes(endlow, [0, 1]);
-        subTimes(starthigh, halfPW);
         subTimes(starthigh, [0, 1]);
-        subTimes(endhigh, halfPW);
         
-        startTime = boundToRange(startTime, startlow, starthigh);
-        endTime = boundToRange(endTime, endlow, endhigh);
+        startTime = boundToRange(trueStart, startlow, starthigh); // the times we're going to query if necessary
+        endTime = boundToRange(trueEnd, endlow, endhigh);
         var dataCache = this.dataCache;
         // Create the mapping for this stream if it isn't already present
         if (!dataCache.hasOwnProperty(uuid)) {
@@ -244,7 +261,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
                 };
             
             if (numRequests == 1) {
-                this.makeDataRequest(uuid, queryStart, queryEnd, pointwidthexp, halfPW, urlCallback, caching);
+                this.makeDataRequest(uuid, queryStart, queryEnd, pointwidthexp, urlCallback, caching);
             } else {
                 if (startsBefore) {
                     i--;
@@ -252,11 +269,11 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
                 if (endsAfter) {
                     j++;
                 }
-                this.makeDataRequest(uuid, queryStart, cache[i + 1].start_time, pointwidthexp, halfPW, urlCallback, caching);
+                this.makeDataRequest(uuid, queryStart, cache[i + 1].start_time, pointwidthexp, urlCallback, caching);
                 for (var k = i + 1; k < j - 1; k++) {
-                    this.makeDataRequest(uuid, cache[k].end_time, cache[k + 1].start_time, pointwidthexp, halfPW, urlCallback, caching);
+                    this.makeDataRequest(uuid, cache[k].end_time, cache[k + 1].start_time, pointwidthexp, urlCallback, caching);
                 }
-                this.makeDataRequest(uuid, cache[j - 1].end_time, queryEnd, pointwidthexp, halfPW, urlCallback, caching);
+                this.makeDataRequest(uuid, cache[j - 1].end_time, queryEnd, pointwidthexp, urlCallback, caching);
             }
         }
     };
@@ -264,31 +281,15 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
 /* Gets all the points where the middle of the interval is between queryStart
    and queryEnd, including queryStart but not queryEnd. HALFPWNANOS should be
    Math.pow(2, pointwidthexp - 1). */
-Cache.prototype.makeDataRequest = function (uuid, queryStart, queryEnd, pointwidthexp, halfpwnanos, callback, caching) {
-        /* queryStart and queryEnd are the start and end of the query I want,
-        in terms of the midpoints of the intervals I get back; the real archiver
-        will give me back all intervals that touch the query range. So I shrink
-        the range by half a pointwidth on each side to compensate for that. */
-        if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
-            halfpwnanos = [0, 0];
-        }
-        var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
-        var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
-        
-        if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
-            trueEnd[0] = trueStart[0];
-            trueEnd[1] = trueStart[1];
-            subTimes(trueStart, [0, 1]);
-        }
-        
+Cache.prototype.makeDataRequest = function (uuid, trueStart, trueEnd, pointwidthexp, callback, caching) {
         var req = uuid + '?starttime=' + timeToStr(trueStart) + '&endtime=' + timeToStr(trueEnd) + '&unitoftime=ns&pw=' + pointwidthexp;
         if (caching) {
             this.requester.makeDataRequest(req, function (data) {
-                    callback(data, queryStart, queryEnd);
+                    callback(data, trueStart, trueEnd);
                 }, 'text');
         } else {
             this.queueRequest(req, function (data) {
-                    callback(data, queryStart, queryEnd);
+                    callback(data, trueStart, trueEnd);
                 }, 'text', pointwidthexp);
         }
     };
@@ -390,6 +391,7 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
                 }
             }
         }
+        
         if (endsAfter) {
             cacheEnd = dataEnd;
             dataAfter = [];

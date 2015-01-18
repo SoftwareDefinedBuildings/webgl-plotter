@@ -115,7 +115,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                             
                             // start caching data in advance
                             setTimeout(function () {
-                                    self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
+                                    //self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
                                 }, 1000);
                             
                             newDrawingCache[uuid] = entry;

@@ -32,7 +32,7 @@ function Cache (requester) {
     this.requester = requester;
 }
 
-Cache.zNormal = new THREE.Vector3(0, 0, 1);
+Cache.zNormal = new THREE.Vector3(0, 0, 0);
 
 /* The start time and end time are two-element arrays. */
 function CacheEntry(startTime, endTime, data) {
@@ -684,6 +684,10 @@ CacheEntry.leftDir = new THREE.Vector3(-1, 0, 0);
 CacheEntry.rightDir = new THREE.Vector3(1, 0, 0);
 CacheEntry.topDir = new THREE.Vector3(0, 1, 0);
 CacheEntry.bottomDir = new THREE.Vector3(0, -1, 0);
+CacheEntry.leftDirMarked = new THREE.Vector3(-1, 0, -1);
+CacheEntry.rightDirMarked = new THREE.Vector3(1, 0, -1);
+CacheEntry.topDirMarked = new THREE.Vector3(0, 1, -1);
+CacheEntry.bottomDirMarked = new THREE.Vector3(0, -1, -1);
 /** Create a geometry and shader so that the data can be drawn quickly. */   
 CacheEntry.prototype.cacheDrawing = function (pwe) {
         var cacheEntry = this;
@@ -767,10 +771,10 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     // It seems that faces only show up if you traverse their vertices counterclockwise
                     if (gap) {
                         if (prevGap) {
-                            normals[vertexID - 8] = CacheEntry.topDir;
-                            normals[vertexID - 7] = CacheEntry.bottomDir;
-                            normals[vertexID - 6] = CacheEntry.rightDir;
-                            normals[vertexID - 5] = CacheEntry.leftDir;
+                            normals[vertexID - 8] = CacheEntry.topDirMarked;
+                            normals[vertexID - 7] = CacheEntry.bottomDirMarked;
+                            normals[vertexID - 6] = CacheEntry.rightDirMarked;
+                            normals[vertexID - 5] = CacheEntry.leftDirMarked;
                         }
                     } else {
                         graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
@@ -860,6 +864,7 @@ function addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, dd
     ddplotnormals.push(CacheEntry.rightDir);
     ddplotVertexID += 8;
     if (ddplotVertexID >= 12) {
+        ddplot.faces.push(new THREE.Face3(ddplotVertexID - 9, ddplotVertexID - 12, ddplotVertexID - 11));
         if (prevPt[5] > prevPrevPt[5]) {
             ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 10, ddplotVertexID - 5));
             ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 9, ddplotVertexID - 5));
@@ -867,6 +872,7 @@ function addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, dd
             ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 5, ddplotVertexID - 10));
             ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 5, ddplotVertexID - 9));
         }
+        ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 6, ddplotVertexID - 7));
     }
     ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 7, ddplotVertexID - 4));
     ddplot.faces.push(new THREE.Face3(ddplotVertexID - 7, ddplotVertexID - 3, ddplotVertexID - 4));
@@ -900,10 +906,19 @@ Cache.makeShaders = function () {
                 uniform float xDomainLoNanos; \
                 attribute vec3 normalVector; \
                 attribute float timeNanos; \
+                float trueThickness; \
+                vec3 trueNormal; \
                 void main() { \
+                    if (normalVector.z < 0.0) { \
+                        trueThickness = 2.5 * thickness; \
+                        trueNormal = vec3(normalVector.x, normalVector.y, 0.0); \
+                    } else { \
+                        trueThickness = thickness; \
+                        trueNormal = normalVector; \
+                    } \
                     float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
                     vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
-                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
+                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(trueThickness * normalize(rot90Matrix * mat3(affineMatrix) * trueNormal), 0.0); \
                     gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                  } \
                  ",

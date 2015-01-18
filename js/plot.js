@@ -130,7 +130,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         }
                                         cacheEntry = self.drawingCache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
-                                        if ((true || !cacheEntry.inSecondaryCache) && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                                        if ((!cacheEntry.inSecondaryCache) && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
                                             cacheEntry.compressIfPossible();
                                             cacheEntry.freeDrawing();
                                         }
@@ -330,7 +330,7 @@ Plot.prototype.drawGraph3 = function () {
                 shader.uniforms.affineMatrix.value = affineMatrix;
                 shader.uniforms.color.value = dispSettings.color;
                 shader.uniforms.rot90Matrix.value = this.rotator90;
-                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
+                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
                 shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
                 shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                 shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;

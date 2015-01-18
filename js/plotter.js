@@ -95,7 +95,13 @@ function Plotter() {
     //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
 	this.requester = new Requester('http://localhost:4523/', 'http://localhost:9000/data/uuid/');
         
-    this.plot = new Plot(this, 2, 0.5, -100, 0);
+    this.plot = new Plot(this, 0, 0.5, -100, 0);
+    
+    // draw white background
+    var bgGeom = new THREE.Geometry();
+    bgGeom.vertices.push(new THREE.Vector3(-200, -200, -100), new THREE.Vector3(200, -200, -100), new THREE.Vector3(200, 200, -100), new THREE.Vector3(-200, 200, -100));
+    bgGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    this.scene.add(new THREE.Mesh(bgGeom, new THREE.MeshBasicMaterial({color: 0xffffff})));
         
     this.updateScreenSize();
            

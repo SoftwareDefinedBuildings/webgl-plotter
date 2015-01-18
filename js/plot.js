@@ -19,11 +19,24 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.plotbgGeom = new THREE.Geometry()
     var w = plotter.VIRTUAL_WIDTH;
     var h = w * hToW;
-    this.plotbgGeom.vertices.push(new THREE.Vector3(x + outermargin, y + outermargin, 0),
-        new THREE.Vector3(x + w - outermargin, y + outermargin, 0),
-        new THREE.Vector3(x + w - outermargin, y + h - outermargin, 0),
-        new THREE.Vector3(x + outermargin, y + h - outermargin, 0));
-    this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    var SCREENZ = 0.01;
+    this.plotbgGeom.vertices.push(new THREE.Vector3(x + outermargin, y + outermargin, SCREENZ),
+        new THREE.Vector3(x + w - outermargin, y + outermargin, SCREENZ),
+        new THREE.Vector3(x + w - outermargin, y + h - outermargin, SCREENZ),
+        new THREE.Vector3(x + outermargin, y + h - outermargin, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - 2, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - 2, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ));
+        
+    this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 5), new THREE.Face3(5, 4, 0),
+        new THREE.Face3(1, 2, 6), new THREE.Face3(6, 5, 1),
+        new THREE.Face3(2, 8, 6), new THREE.Face3(7, 10, 3), new THREE.Face3(8, 2, 3), new THREE.Face3(3, 10, 8), new THREE.Face3(6, 9, 11), new THREE.Face3(11, 7, 6),
+        new THREE.Face3(7, 3, 0), new THREE.Face3(0, 4, 7));
     var plotbg = new THREE.Mesh(this.plotbgGeom, new THREE.MeshBasicMaterial({color: 0x00ff00}));
     plotter.scene.add(plotbg);
     
@@ -34,13 +47,16 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
         new THREE.Vector3(-this.innermargin.right, -this.innermargin.top, 0),
         new THREE.Vector3(this.innermargin.left, -this.innermargin.top, 0)];
     
-    // draw the plot space
+    // "draw" the plot space. It's transparent but it's needed to detect mouse clicks.
     this.plotspGeom = new THREE.Geometry();
     
     this.plotspGeom.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
     this.resizeToMargins();
     this.plotspGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
-    var plotsp = new THREE.Mesh(this.plotspGeom, new THREE.MeshBasicMaterial({color: 0xffffff}));
+    var material = new THREE.MeshBasicMaterial();
+    material.transparent = true;
+    material.opacity = 0;
+    var plotsp = new THREE.Mesh(this.plotspGeom, material);
     plotter.scene.add(plotsp);
     
     // detect clicks in the plot space

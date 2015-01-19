@@ -97,9 +97,9 @@ function Plotter() {
         
     this.plot = new Plot(this, 0, 0.5, -100, 0);
     
-    // draw white background
+    // draw white background behind the plot
     var bgGeom = new THREE.Geometry();
-    bgGeom.vertices.push(new THREE.Vector3(-200, -200, -100), new THREE.Vector3(200, -200, -100), new THREE.Vector3(200, 200, -100), new THREE.Vector3(-200, 200, -100));
+    bgGeom.vertices.push(new THREE.Vector3(-200, 0, -100), new THREE.Vector3(200, 0, -100), new THREE.Vector3(200, 200, -100), new THREE.Vector3(-200, 200, -100));
     bgGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     this.scene.add(new THREE.Mesh(bgGeom, new THREE.MeshBasicMaterial({color: 0xffffff})));
         

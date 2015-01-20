@@ -112,15 +112,17 @@ function Plotter() {
     if (window.devicePixelRatio !== undefined) {
       dpr = window.devicePixelRatio;
     }
+    
+    this.antialias = 2;
 
     renderScene = new THREE.RenderPass(this.scene, this.camera);
-    //effectFXAA = new THREE.ShaderPass(THREE.CopyShader);
-    effectFXAA = new THREE.ShaderPass(THREE.FXAAShader);
-    effectFXAA.uniforms['resolution'].value.set(1 / (this.width * dpr), 1 / (this.height * dpr));
+    effectFXAA = new THREE.ShaderPass(THREE.CopyShader);
+    //effectFXAA = new THREE.ShaderPass(THREE.FXAAShader);
+    //effectFXAA.uniforms['resolution'].value.set(1 / (this.width * dpr), 1 / (this.height * dpr));
     effectFXAA.renderToScreen = true;
 
     composer = new THREE.EffectComposer(this.renderer);
-    composer.setSize(this.width * dpr, this.height * dpr);
+    composer.setSize(this.antialias * this.width * dpr, this.antialias * this.height * dpr);
     composer.addPass(renderScene);
     composer.addPass(effectFXAA);
            

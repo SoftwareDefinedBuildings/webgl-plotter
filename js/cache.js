@@ -353,7 +353,7 @@ Cache.prototype.effectSecondaryRequests = function () {
                                 cb(data);
                             };
                     })(entry[1]), entry[2], function () {
-                        selfpendingRequests--;
+                        self.pendingRequests--;
                     });
             }
         }
@@ -688,7 +688,6 @@ CacheEntry.leftDirMarked = new THREE.Vector3(-1, 0, -1);
 CacheEntry.rightDirMarked = new THREE.Vector3(1, 0, -1);
 CacheEntry.topDirMarked = new THREE.Vector3(0, 1, -1);
 CacheEntry.bottomDirMarked = new THREE.Vector3(0, -1, -1);
-/** Create a geometry and shader so that the data can be drawn quickly. */   
 CacheEntry.prototype.cacheDrawing = function (pwe) {
         var cacheEntry = this;
         var graph = new THREE.Geometry();
@@ -700,9 +699,11 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         var ddplotVertexID = 0;
         var vertexVect;
         var ddplotVertex;
+        var range1, range2;
         var timeNanos = [];
         var normals = [];
         var rangeTimeNanos = [];
+        var rangePerturb = [];
         var ddplotNanos = [];
         var ddplotnormals = [];
         var shader, rangeShader;
@@ -731,8 +732,10 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     timeNanos.push(pt[1]);
                 }
                 
-                rangegraph.vertices.push(new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[2], pt[0] % 1000000));
-                rangegraph.vertices.push(new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[4], pt[0] % 1000000));
+                range1 = new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[2], pt[0] % 1000000);
+                range2 = new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[4], pt[0] % 1000000);
+                rangegraph.vertices.push(range1);
+                rangegraph.vertices.push(range2);
                 
                 rangeTimeNanos.push(pt[1]);
                 rangeTimeNanos.push(pt[1]);
@@ -740,15 +743,6 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                 rangeVertexID += 2;
                 
                 vertexID += 4;
-                
-                
-                /*for (j = 0; j < 6; j++) {
-                    pvect = new THREE.Vector3(x, y, 0);
-                    pvect.add(transforms[j]);
-                    points.vertices.push(pvect);
-                }
-                
-                pointID += 6;*/
                 
                 gap = cmpTimes(subTimes(pt.slice(0, 2), prevPt), gapThreshold) > 0;
                 
@@ -758,6 +752,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     if (gap) {
                         ddplotVertexID = addDDSeg(pt, prevPt, null, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
                     }
+                    rangePerturb.push(0, 0);
                 } else {
                     tempTime = subTimes(pt.slice(0, 2), prevPt);
                     normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], pt[3] - prevPt[3], 0);
@@ -784,10 +779,27 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
                     
                     if (gap) {
-                        // TODO We'll have to perturb things a bit to get a visibly thick vertical line
+                        if (prevGap && prevPt[2] != prevPt[4]) {
+                            // We'll have to perturb things a bit to get a visibly thick vertical line
+                            rangegraph.pop();
+                            rangegraph.pop();
+                            rangePerturb.pop();
+                            rangePerturb.pop();
+                            rangegraph.vertices.push(rangegraph.vertices[rangegraph.vertices.length - 2]);
+                            rangegraph.vertices.push(rangegraph.vertices[rangegraph.vertices.length - 1]);
+                            rangeVertexID += 2;
+                            rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
+                            rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                            rangegraph.vertices.push(range1);
+                            rangegraph.vertices.push(range2);
+                            rangePerturb.push(-1, -1, 1, 1, 0, 0);
+                        } else {
+                            rangePerturb.push(0, 0);
+                        }
                     } else {
                         rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
                         rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                        rangePerturb.push(0, 0);
                     }
                     
                     ddplotMax = Math.max(prevPt[5], ddplotMax);
@@ -809,7 +821,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
             }
         }
         
-        // Deal with last point for data density plot
+        // Deal with last point
         pt = [cacheEntry.end_time[0], cacheEntry.end_time[1], 0, 0, 0, 0];
         gap = cmpTimes(subTimes(pt.slice(0, 2), prevPt), gapThreshold) > 0;
         ddplotMax = Math.max(prevPt[5], ddplotMax);
@@ -821,6 +833,25 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
             prevPt = endPrevInt;
         }
         ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+        
+        if (prevGap) {
+            normals[vertexID - 4] = CacheEntry.topDirMarked;
+            normals[vertexID - 3] = CacheEntry.bottomDirMarked;
+            normals[vertexID - 2] = CacheEntry.rightDirMarked;
+            normals[vertexID - 1] = CacheEntry.leftDirMarked;
+        }
+        graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 3, vertexID - 2));
+        graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 1, vertexID - 3));
+        
+        if (prevGap && prevPt[2] != prevPt[4]) {
+            // We'll have to perturb things a bit to get a visibly thick vertical line
+            rangegraph.vertices.push(rangegraph.vertices[rangegraph.vertices.length - 2]);
+            rangegraph.vertices.push(rangegraph.vertices[rangegraph.vertices.length - 1]);
+            rangeVertexID += 2;
+            rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
+            rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+            rangePerturb.push(-1, -1, 1, 1);
+        }
         
         graph.verticesNeedUpdate = true;
         graph.elementsNeedUpdate = true;
@@ -837,6 +868,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         cacheEntry.cached_drawing.normals = normals;
         cacheEntry.cached_drawing.timeNanos = timeNanos;
         cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;
+        cacheEntry.cached_drawing.rangePerturb = rangePerturb;
         cacheEntry.cached_drawing.ddplotnormals = ddplotnormals;
         cacheEntry.cached_drawing.ddplotNanos = ddplotNanos;
         cacheEntry.cached_drawing.ddplotMax = ddplotMax;
@@ -934,6 +966,7 @@ Cache.makeShaders = function () {
                 uniforms: {
                     "affineMatrix": {type: 'm4'},
                     "color": {type: 'v3'},
+                    "thickness": {type: 'f'},
                     "alpha": {type: 'f'},
                     "yDomainLo": {type: 'f'},
                     "xDomainLo1000": {type: 'f'},
@@ -942,17 +975,21 @@ Cache.makeShaders = function () {
                     },
                 attributes: {
                     "timeNanos": {type: 'f'},
+                    "rangePerturb": {type: 'f'}
                     },
                 vertexShader: " \
                     uniform mat4 affineMatrix; \
+                    uniform float thickness; \
                     uniform float yDomainLo; \
                     uniform float xDomainLo1000; \
                     uniform float xDomainLoMillis; \
                     uniform float xDomainLoNanos; \
                     attribute float timeNanos; \
+                    attribute float rangePerturb; \
                     void main() { \
                         float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
                         vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0); \
+                        newPosition.x += rangePerturb * thickness; \
                         gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                      } \
                      ",

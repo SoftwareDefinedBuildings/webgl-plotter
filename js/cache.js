@@ -32,6 +32,8 @@ function Cache (requester) {
     this.requester = requester;
 }
 
+Cache.zNormal = new THREE.Vector3(0, 0, 0);
+
 /* The start time and end time are two-element arrays. */
 function CacheEntry(startTime, endTime, data) {
     this.start_time = startTime;
@@ -50,11 +52,35 @@ CacheEntry.prototype.getLength = function () {
         return length;
     };
     
+CacheEntry.prototype.compressIfPossible = function () {
+        var graph = this.cached_drawing.graph;
+        var rangegraph = this.cached_drawing.rangegraph;
+        var ddplot = this.cached_drawing.ddplot;
+        if (graph.vertices.length > 0 && !graph.verticesNeedUpdate) {
+            graph.vertices = [];
+        }
+        if (graph.faces.length > 0 && !graph.elementsNeedUpdate) {
+            graph.faces = [];
+        }
+        if (rangegraph.vertices.length > 0 && !rangegraph.verticesNeedUpdate) {
+            rangegraph.vertices = [];
+        }
+        if (rangegraph.faces.length > 0 && !rangegraph.elementsNeedUpdate) {
+            rangegraph.faces = [];
+        }
+        if (ddplot.vertices.length > 0 && !ddplot.verticesNeedUpdate) {
+            ddplot.vertices = [];
+        }
+        if (ddplot.faces.length > 0 && !ddplot.elementsNeedUpdate) {
+            ddplot.faces = [];
+        }
+    };
+    
 CacheEntry.prototype.freeDrawing = function () {
         this.cached_drawing.graph.dispose();
         this.cached_drawing.rangegraph.dispose();
-        delete this.cached_drawing.graph;
-        delete this.cached_drawing.rangegraph;
+        this.cached_drawing.ddplot.dispose();
+        this.cached_drawing = {};
     };
     
 CacheEntry.prototype.removeFromSecCache = function () {
@@ -113,8 +139,7 @@ Cache.prototype.validateLoaded = function () {
                 }
             }
         }
-        console.log(total);
-        console.log(this.loadedData);
+        console.log(total + " " + this.loadedData);
         return total == this.loadedData;
     };
 
@@ -151,21 +176,38 @@ function validateContiguous(cacheEntry, pwe) {
    */
 Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
-        var halfPW = expToPW(pointwidthexp - 1);
+        
+        var queryStart = startTime;
+        var queryEnd = endTime;
+        
+        var halfpwnanos = expToPW(pointwidthexp - 1);
+        
+        /* queryStart and queryEnd are the start and end of the query I want,
+        in terms of the midpoints of the intervals I get back; the real archiver
+        will give me back all intervals that touch the query range. So I shrink
+        the range by half a pointwidth on each side to compensate for that. */
+        if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
+            halfpwnanos = [0, 0];
+        }
+        var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
+        var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
+        
+        if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
+            trueEnd[0] = trueStart[0];
+            trueEnd[1] = trueStart[1];
+            subTimes(trueStart, [0, 1]);
+        }
+        
         var startlow = [this.queryLow[0], this.queryLow[1]];
         var endlow = [this.queryLow[0], this.queryLow[1]];
         var starthigh = [this.queryHigh[0], this.queryHigh[1]];
         var endhigh = [this.queryHigh[0], this.queryHigh[1]];
         
-        addTimes(startlow, halfPW);
-        addTimes(endlow, halfPW);
         addTimes(endlow, [0, 1]);
-        subTimes(starthigh, halfPW);
         subTimes(starthigh, [0, 1]);
-        subTimes(endhigh, halfPW);
         
-        startTime = boundToRange(startTime, startlow, starthigh);
-        endTime = boundToRange(endTime, endlow, endhigh);
+        startTime = boundToRange(trueStart, startlow, starthigh); // the times we're going to query if necessary
+        endTime = boundToRange(trueEnd, endlow, endhigh);
         var dataCache = this.dataCache;
         // Create the mapping for this stream if it isn't already present
         if (!dataCache.hasOwnProperty(uuid)) {
@@ -219,7 +261,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
                 };
             
             if (numRequests == 1) {
-                this.makeDataRequest(uuid, queryStart, queryEnd, pointwidthexp, halfPW, urlCallback, caching);
+                this.makeDataRequest(uuid, queryStart, queryEnd, pointwidthexp, urlCallback, caching);
             } else {
                 if (startsBefore) {
                     i--;
@@ -227,11 +269,11 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
                 if (endsAfter) {
                     j++;
                 }
-                this.makeDataRequest(uuid, queryStart, cache[i + 1].start_time, pointwidthexp, halfPW, urlCallback, caching);
+                this.makeDataRequest(uuid, queryStart, cache[i + 1].start_time, pointwidthexp, urlCallback, caching);
                 for (var k = i + 1; k < j - 1; k++) {
-                    this.makeDataRequest(uuid, cache[k].end_time, cache[k + 1].start_time, pointwidthexp, halfPW, urlCallback, caching);
+                    this.makeDataRequest(uuid, cache[k].end_time, cache[k + 1].start_time, pointwidthexp, urlCallback, caching);
                 }
-                this.makeDataRequest(uuid, cache[j - 1].end_time, queryEnd, pointwidthexp, halfPW, urlCallback, caching);
+                this.makeDataRequest(uuid, cache[j - 1].end_time, queryEnd, pointwidthexp, urlCallback, caching);
             }
         }
     };
@@ -239,31 +281,15 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
 /* Gets all the points where the middle of the interval is between queryStart
    and queryEnd, including queryStart but not queryEnd. HALFPWNANOS should be
    Math.pow(2, pointwidthexp - 1). */
-Cache.prototype.makeDataRequest = function (uuid, queryStart, queryEnd, pointwidthexp, halfpwnanos, callback, caching) {
-        /* queryStart and queryEnd are the start and end of the query I want,
-        in terms of the midpoints of the intervals I get back; the real archiver
-        will give me back all intervals that touch the query range. So I shrink
-        the range by half a pointwidth on each side to compensate for that. */
-        if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
-            halfpwnanos = [0, 0];
-        }
-        var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
-        var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
-        
-        if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
-            trueEnd[0] = trueStart[0];
-            trueEnd[1] = trueStart[1];
-            subTimes(trueStart, [0, 1]);
-        }
-        
+Cache.prototype.makeDataRequest = function (uuid, trueStart, trueEnd, pointwidthexp, callback, caching) {
         var req = uuid + '?starttime=' + timeToStr(trueStart) + '&endtime=' + timeToStr(trueEnd) + '&unitoftime=ns&pw=' + pointwidthexp;
         if (caching) {
             this.requester.makeDataRequest(req, function (data) {
-                    callback(data, queryStart, queryEnd);
+                    callback(data, trueStart, trueEnd);
                 }, 'text');
         } else {
             this.queueRequest(req, function (data) {
-                    callback(data, queryStart, queryEnd);
+                    callback(data, trueStart, trueEnd);
                 }, 'text', pointwidthexp);
         }
     };
@@ -365,6 +391,7 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
                 }
             }
         }
+        
         if (endsAfter) {
             cacheEnd = dataEnd;
             dataAfter = [];
@@ -380,6 +407,18 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
                 n++;
             }
         }
+        
+        var entryLength;
+        var loadedStreams = this.loadedStreams;
+        for (var k = i; k <= j; k++) {
+            // Update the amount of data has been loaded into the cache
+            entryLength = cache[k].getLength();
+            this.loadedData -= entryLength;
+            loadedStreams[uuid] -= entryLength;
+            // Dispose of the geometries to avoid leaking memory
+            cache[k].removeFromSecCache();
+        }
+        
         var cacheEntry;
         if (m == n) {
             if (dataBefore.length > 0) {
@@ -389,17 +428,6 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
             }
         } else {
             cacheEntry = new CacheEntry(cacheStart, cacheEnd, $.merge($.merge(dataBefore, [data.slice(m, n)]), dataAfter));
-        }
-        var loadedStreams = this.loadedStreams;
-        var entryLength;
-        for (var k = i; k <= j; k++) {
-            // Update the amount of data has been loaded into the cache
-            entryLength = cache[k].getLength();
-            this.loadedData -= entryLength;
-            loadedStreams[uuid] -= entryLength;
-            
-            // Dispose of the geometries to avoid leaking memory
-            cache[k].removeFromSecCache();
         }
         entryLength = cacheEntry.getLength(); // Perhaps we could optimize this? Probably not necessary though.
         this.loadedData += entryLength;
@@ -648,107 +676,215 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
             }
         }
         
-        // Delete all but displayed data, if deleting streams, pointwidths, and cache entries was not enough
-        for (i = 0; i < streams.length; i++) {
-            pwdata = dataCache[streams[i].uuid][currPWE][0].cached_data;
-            this.loadedData -= pwdata.length;
-            loadedStreams[streams[i].uuid] -= pwdata.length; // this should be 0 now
-            j = binSearchCmp(pwdata, startTime, cmpTimes);
-            k = binSearchCmp(pwdata, endTime, cmpTimes);
-            if (cmpTimes(pwdata[j], startTime) >= 0 && j > 0) {
-                j--;
-            }
-            if (cmpTimes(pwdata[k], endTime) <= 0 && k < pwdata.length - 1) {
-                k++;
-            }
-            dataCache[streams[i].uuid][currPWE][0].removeFromSecCache();
-            dataCache[streams[i].uuid][currPWE][0] = new CacheEntry([pwdata[j][0], pwdata[j][1]], [pwdata[k][0], pwdata[k][1]], pwdata.slice(j, k));
-            loadedStreams[streams[i].uuid] += (k - j);
-            this.loadedData += (k - j);
-        }
-        
-        // If target is still less than loadedData, it means that target isn't big enough to accomodate the data that needs to be displayed on the screen
+        // If target is still less than loadedData, it means that target isn't big enough to accomodate the current cache entry
         return true;
     };
  
+CacheEntry.leftDir = new THREE.Vector3(-1, 0, 0);
+CacheEntry.rightDir = new THREE.Vector3(1, 0, 0);
+CacheEntry.topDir = new THREE.Vector3(0, 1, 0);
+CacheEntry.bottomDir = new THREE.Vector3(0, -1, 0);
+CacheEntry.leftDirMarked = new THREE.Vector3(-1, 0, -1);
+CacheEntry.rightDirMarked = new THREE.Vector3(1, 0, -1);
+CacheEntry.topDirMarked = new THREE.Vector3(0, 1, -1);
+CacheEntry.bottomDirMarked = new THREE.Vector3(0, -1, -1);
 /** Create a geometry and shader so that the data can be drawn quickly. */   
-function cacheDrawing(cacheEntry) {
-    var graph = new THREE.Geometry();
-    var rangegraph = new THREE.Geometry();
-    var data = cacheEntry.cached_data;
-    var vertexID = 0;
-    var rangeVertexID = 0;
-    var vertexVect;
-    var timeNanos = [];
-    var normals = [];
-    var rangeTimeNanos = [];
-    var shader, rangeShader;
-    var i, j, k;
-    var prevI, prevK;
-    for (k = 0; k < data.length; k++) {
-        for (i = 0; i < data[k].length; i++) {
-            // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
-            vertexVect = new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][3], data[k][i][0] % 1000000);
-            
-            for (j = 0; j < 4; j++) {
-                // These are reference copies, but that's OK since it gets sent to the vertex shader
-                graph.vertices.push(vertexVect);
-                timeNanos.push(data[k][i][1]);
-            }
-            
-            rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][2], data[k][i][0] % 1000000));
-            rangegraph.vertices.push(new THREE.Vector3(Math.floor(data[k][i][0] / 1000000), data[k][i][4], data[k][i][0] % 1000000));
-            
-            rangeTimeNanos.push(data[k][i][1]);
-            rangeTimeNanos.push(data[k][i][1]);
-            
-            rangeVertexID += 2;
-            
-            vertexID += 4;
-            
-            /*for (j = 0; j < 6; j++) {
-                pvect = new THREE.Vector3(x, y, 0);
-                pvect.add(transforms[j]);
-                points.vertices.push(pvect);
-            }
-            
-            pointID += 6;*/
-            
-            if (i == 0 && k == 0) {
-                normals.push(new THREE.Vector3(0, 0, 1));
-                normals.push(new THREE.Vector3(0, 0, 1));
-            } else {
-                tempTime = subTimes(data[k][i].slice(0, 2), data[prevK][prevI]);
-                normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], data[k][i][3] - data[prevK][prevI][3], 0);
-                // Again, reference copies are OK because it gets sent to the vertex shader
-                normals.push(normal);
-                normals.push(normal.clone());
-                normals.push(normal);
-                normals.push(normals[vertexID - 5]);
-                normals[vertexID - 5].negate();
-
-                // It seems that faces only show up if you traverse their vertices counterclockwise
-                graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
-                graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
-                graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
-                graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
+CacheEntry.prototype.cacheDrawing = function (pwe) {
+        var cacheEntry = this;
+        var graph = new THREE.Geometry();
+        var rangegraph = new THREE.Geometry();
+        var ddplot = new THREE.Geometry();
+        var data = cacheEntry.cached_data;
+        var vertexID = 0;
+        var rangeVertexID = 0;
+        var ddplotVertexID = 0;
+        var vertexVect;
+        var ddplotVertex;
+        var timeNanos = [];
+        var normals = [];
+        var rangeTimeNanos = [];
+        var ddplotNanos = [];
+        var ddplotnormals = [];
+        var shader, rangeShader;
+        var ddplotMax = 0;
+        var i, j, k;
+        var prevI, prevK;
+        var pt, prevPt;
+        var prevGap = false;
+        var gapThreshold = expToPW(pwe);
+        var gap;
+        var prevCount;
+        var endPrevInt;
+        prevPt = [cacheEntry.start_time[0], cacheEntry.start_time[1], 0, 0, 0, 0];
+        var prevPrevPt;
+        
+        for (k = 0; k < data.length; k++) {
+            for (i = 0; i < data[k].length; i++) {
+                pt = data[k][i];
                 
-                /*points.faces.push(new THREE.Face3(pointID - 3, pointID - 5, pointID - 4));
-                points.faces.push(new THREE.Face3(pointID - 3, pointID - 6, pointID - 5));
-                points.faces.push(new THREE.Face3(pointID - 3, pointID - 1, pointID - 6));
-                points.faces.push(new THREE.Face3(pointID - 3, pointID - 2, pointID - 1));*/
+                // The x and z coordinates are unused, so we can put the relevent time components there instead of using attribute values
+                vertexVect = new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[3], pt[0] % 1000000);
                 
-                rangegraph.faces.push(new THREE.Face3(rangeVertexID - 1, rangeVertexID - 3, rangeVertexID - 4));
-                rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                for (j = 0; j < 4; j++) {
+                    // These are reference copies, but that's OK since it gets sent to the vertex shader
+                    graph.vertices.push(vertexVect);
+                    timeNanos.push(pt[1]);
+                }
+                
+                rangegraph.vertices.push(new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[2], pt[0] % 1000000));
+                rangegraph.vertices.push(new THREE.Vector3(Math.floor(pt[0] / 1000000), pt[4], pt[0] % 1000000));
+                
+                rangeTimeNanos.push(pt[1]);
+                rangeTimeNanos.push(pt[1]);
+                
+                rangeVertexID += 2;
+                
+                vertexID += 4;
+                
+                
+                /*for (j = 0; j < 6; j++) {
+                    pvect = new THREE.Vector3(x, y, 0);
+                    pvect.add(transforms[j]);
+                    points.vertices.push(pvect);
+                }
+                
+                pointID += 6;*/
+                
+                gap = cmpTimes(subTimes(pt.slice(0, 2), prevPt), gapThreshold) > 0;
+                
+                if (i == 0 && k == 0) {
+                    normals.push(Cache.zNormal);
+                    normals.push(Cache.zNormal);
+                    if (gap) {
+                        ddplotVertexID = addDDSeg(pt, prevPt, null, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                    }
+                } else {
+                    tempTime = subTimes(pt.slice(0, 2), prevPt);
+                    normal = new THREE.Vector3(1000000 * tempTime[0] + tempTime[1], pt[3] - prevPt[3], 0);
+                    // Again, reference copies are OK because it gets sent to the vertex shader
+                    normals.push(normal);
+                    normals.push(normal.clone());
+                    normals.push(normal);
+                    normals.push(normals[vertexID - 5]);
+                    normals[vertexID - 5].negate();
+                    
+                    // It seems that faces only show up if you traverse their vertices counterclockwise
+                    if (gap) {
+                        if (prevGap) {
+                            normals[vertexID - 8] = CacheEntry.topDirMarked;
+                            normals[vertexID - 7] = CacheEntry.bottomDirMarked;
+                            normals[vertexID - 6] = CacheEntry.rightDirMarked;
+                            normals[vertexID - 5] = CacheEntry.leftDirMarked;
+                        }
+                    } else {
+                        graph.faces.push(new THREE.Face3(vertexID - 6, vertexID - 5, vertexID - 4));
+                        graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 5, vertexID - 3));
+                    }
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 7, vertexID - 6));
+                    graph.faces.push(new THREE.Face3(vertexID - 8, vertexID - 5, vertexID - 7));
+                    
+                    if (gap) {
+                        // TODO We'll have to perturb things a bit to get a visibly thick vertical line
+                    } else {
+                        rangegraph.faces.push(new THREE.Face3(rangeVertexID - 4, rangeVertexID - 1, rangeVertexID - 3));
+                        rangegraph.faces.push(new THREE.Face3(rangeVertexID - 2, rangeVertexID - 1, rangeVertexID - 4));
+                    }
+                    
+                    ddplotMax = Math.max(prevPt[5], ddplotMax);
+                    if (gap) {
+                        // We ought to zero the ddplot for the appropriate time interval
+                        endPrevInt = addTimes([prevPt[0], prevPt[1], 0, 0, 0, 0], gapThreshold);
+                        ddplotVertexID = addDDSeg(endPrevInt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                        prevPrevPt = prevPt;
+                        prevPt = endPrevInt;
+                    }
+                    ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+                }
+                
+                prevPrevPt = prevPt
+                prevPt = pt;
+                prevI = i;
+                prevK = k;
+                prevGap = gap;
             }
-            prevI = i;
-            prevK = k;
         }
-    }
+        
+        // Deal with last point for data density plot
+        pt = [cacheEntry.end_time[0], cacheEntry.end_time[1], 0, 0, 0, 0];
+        gap = cmpTimes(subTimes(pt.slice(0, 2), prevPt), gapThreshold) > 0;
+        ddplotMax = Math.max(prevPt[5], ddplotMax);
+        if (gap) {
+            // We ought to zero the ddplot for the appropriate time interval
+            endPrevInt = addTimes([prevPt[0], prevPt[1], 0, 0, 0, 0], gapThreshold);
+            ddplotVertexID = addDDSeg(endPrevInt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+            prevPrevPt = prevPt;
+            prevPt = endPrevInt;
+        }
+        ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
+        
+        graph.verticesNeedUpdate = true;
+        graph.elementsNeedUpdate = true;
+        rangegraph.verticesNeedUpdate = true;
+        rangegraph.elementsNeedUpdate = true;
+        ddplot.verticesNeedUpdate = true;
+        ddplot.elementsNeedUpdate = true;
+        normals.push(Cache.zNormal);
+        normals.push(Cache.zNormal);
+        
+        cacheEntry.cached_drawing.graph = graph;
+        cacheEntry.cached_drawing.rangegraph = rangegraph;
+        cacheEntry.cached_drawing.ddplot = ddplot
+        cacheEntry.cached_drawing.normals = normals;
+        cacheEntry.cached_drawing.timeNanos = timeNanos;
+        cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;
+        cacheEntry.cached_drawing.ddplotnormals = ddplotnormals;
+        cacheEntry.cached_drawing.ddplotNanos = ddplotNanos;
+        cacheEntry.cached_drawing.ddplotMax = ddplotMax;
+    };
     
-    shader = new THREE.ShaderMaterial({
+function addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID) {
+    var j;
+    ddplotVertex = new THREE.Vector3(Math.floor(prevPt[0] / 1000000), prevPt[5], prevPt[0] % 1000000);
+    for (j = 0; j < 4; j++) {
+        ddplot.vertices.push(ddplotVertex);
+        ddplotNanos.push(prevPt[1]);
+    }
+    ddplotnormals.push(CacheEntry.topDir);
+    ddplotnormals.push(CacheEntry.bottomDir);
+    ddplotnormals.push(CacheEntry.leftDir);
+    ddplotnormals.push(CacheEntry.rightDir);
+    ddplotVertex = new THREE.Vector3(Math.floor(pt[0] / 1000000), prevPt[5], pt[0] % 1000000);
+    for (j = 0; j < 4; j++) {
+        ddplot.vertices.push(ddplotVertex);
+        ddplotNanos.push(pt[1]);
+    }
+    ddplotnormals.push(CacheEntry.topDir);
+    ddplotnormals.push(CacheEntry.bottomDir);
+    ddplotnormals.push(CacheEntry.leftDir);
+    ddplotnormals.push(CacheEntry.rightDir);
+    ddplotVertexID += 8;
+    if (ddplotVertexID >= 12) {
+        ddplot.faces.push(new THREE.Face3(ddplotVertexID - 9, ddplotVertexID - 12, ddplotVertexID - 11));
+        if (prevPt[5] > prevPrevPt[5]) {
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 10, ddplotVertexID - 5));
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 9, ddplotVertexID - 5));
+        } else if (prevPt[5] < prevPrevPt[5]) {
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 6, ddplotVertexID - 5, ddplotVertexID - 10));
+            ddplot.faces.push(new THREE.Face3(ddplotVertexID - 10, ddplotVertexID - 5, ddplotVertexID - 9));
+        }
+        ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 6, ddplotVertexID - 7));
+    }
+    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 8, ddplotVertexID - 7, ddplotVertexID - 4));
+    ddplot.faces.push(new THREE.Face3(ddplotVertexID - 7, ddplotVertexID - 3, ddplotVertexID - 4));
+    
+    return ddplotVertexID;
+}
+
+Cache.makeShaders = function () {
+        var shader = new THREE.ShaderMaterial({
             uniforms: {
                 "affineMatrix": {type: 'm4'},
+                "color": {type: 'v3'},
                 "rot90Matrix": {type: 'm3'},
                 "thickness": {type: 'f'},
                 "yDomainLo": {type: 'f'},
@@ -757,8 +893,8 @@ function cacheDrawing(cacheEntry) {
                 "xDomainLoNanos": {type: 'f'}
                 },
             attributes: {
-                "normalVector": {type: 'v3', value: normals},
-                "timeNanos": {type: 'f', value: timeNanos}
+                "normalVector": {type: 'v3'},
+                "timeNanos": {type: 'f'}
                 },
             vertexShader: " \
                 uniform mat4 affineMatrix; \
@@ -770,65 +906,140 @@ function cacheDrawing(cacheEntry) {
                 uniform float xDomainLoNanos; \
                 attribute vec3 normalVector; \
                 attribute float timeNanos; \
+                float trueThickness; \
+                vec3 trueNormal; \
                 void main() { \
+                    if (normalVector.z < 0.0) { \
+                        trueThickness = 2.5 * thickness; \
+                        trueNormal = vec3(normalVector.x, normalVector.y, 0.0); \
+                    } else { \
+                        trueThickness = thickness; \
+                        trueNormal = normalVector; \
+                    } \
                     float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
                     vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
-                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(rot90Matrix * mat3(affineMatrix) * normalVector), 0.0); \
+                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(trueThickness * normalize(rot90Matrix * mat3(affineMatrix) * trueNormal), 0.0); \
                     gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                  } \
                  ",
             fragmentShader: "\
-                 void main() { \
-                     gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); \
-                 } \
-                 "
-        });
+                uniform vec3 color; \
+                void main() { \
+                    gl_FragColor = vec4(color, 1.0); \
+                } \
+                "
+            });
         
-    rangeshader = new THREE.ShaderMaterial({
+        var rangeshader = new THREE.ShaderMaterial({
+                uniforms: {
+                    "affineMatrix": {type: 'm4'},
+                    "color": {type: 'v3'},
+                    "alpha": {type: 'f'},
+                    "yDomainLo": {type: 'f'},
+                    "xDomainLo1000": {type: 'f'},
+                    "xDomainLoMillis": {type: 'f'},
+                    "xDomainLoNanos": {type: 'f'}
+                    },
+                attributes: {
+                    "timeNanos": {type: 'f'},
+                    },
+                vertexShader: " \
+                    uniform mat4 affineMatrix; \
+                    uniform float yDomainLo; \
+                    uniform float xDomainLo1000; \
+                    uniform float xDomainLoMillis; \
+                    uniform float xDomainLoNanos; \
+                    attribute float timeNanos; \
+                    void main() { \
+                        float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
+                        vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0); \
+                        gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
+                     } \
+                     ",
+                fragmentShader: "\
+                    uniform vec3 color; \
+                    uniform float alpha; \
+                    void main() { \
+                        gl_FragColor = vec4(color, alpha); \
+                    } \
+                    "
+                });
+                
+        rangeshader.transparent = true;
+        
+        var ddplotshader = new THREE.ShaderMaterial({
             uniforms: {
                 "affineMatrix": {type: 'm4'},
+                "color": {type: 'v3'},
+                "thickness": {type: 'f'},
                 "yDomainLo": {type: 'f'},
                 "xDomainLo1000": {type: 'f'},
                 "xDomainLoMillis": {type: 'f'},
                 "xDomainLoNanos": {type: 'f'}
                 },
             attributes: {
-                "timeNanos": {type: 'f', value: rangeTimeNanos},
+                "normalVector": {type: 'v3'},
+                "timeNanos": {type: 'f'}
                 },
             vertexShader: " \
                 uniform mat4 affineMatrix; \
+                uniform float thickness; \
                 uniform float yDomainLo; \
                 uniform float xDomainLo1000; \
                 uniform float xDomainLoMillis; \
                 uniform float xDomainLoNanos; \
+                attribute vec3 normalVector; \
                 attribute float timeNanos; \
                 void main() { \
                     float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
-                    vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0); \
+                    vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
+                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(thickness * normalize(mat3(affineMatrix) * normalVector), 0.0); \
                     gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                  } \
                  ",
             fragmentShader: "\
-                 void main() { \
-                     gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5); \
-                 } \
-                 "
-        });
-        
-    rangeshader.transparent = true;
+                uniform vec3 color; \
+                void main() { \
+                    gl_FragColor = vec4(color, 1.0); \
+                } \
+                "
+            });
+                
+        return [shader, rangeshader, ddplotshader];
+    };
     
-    graph.verticesNeedUpdate = true;
-    graph.elementsNeedUpdate = true;
-    rangegraph.verticesNeedUpdate = true;
-    rangegraph.elementsNeedUpdate = true;
-    normals.push(new THREE.Vector3(0, 0, 1));
-    normals.push(new THREE.Vector3(0, 0, 1));
-    
-    cacheEntry.cached_drawing.graph = graph;
-    cacheEntry.cached_drawing.rangegraph = rangegraph;
-    cacheEntry.cached_drawing.normals = normals;
-    cacheEntry.cached_drawing.timeNanos = timeNanos;
-    cacheEntry.cached_drawing.shader = shader;
-    cacheEntry.cached_drawing.rangeshader = rangeshader;
+function FacePool() {
+    this.faces = [true, true, true, true, true, true, true, true];
 }
 
+FacePool.prototype.fillArr = function (arr, vStart, vEnd) {
+        var i = vStart;
+        if (vEnd < this.faces.length) {
+            while (i < vEnd) {
+                arr.push(this.faces[i]);
+                arr.push(this.faces[i + 1]);
+                arr.push(this.faces[i + 2]);
+                arr.push(this.faces[i + 3]);
+                i += 4;
+            }
+            return;
+        }
+        while (i < this.faces.length) {
+            arr.push(this.faces[i]);
+            arr.push(this.faces[i + 1]);
+            arr.push(this.faces[i + 2]);
+            arr.push(this.faces[i + 3]);
+            i += 4;
+        }
+        while (i < vEnd) {
+            this.faces.push(new THREE.Face3(i - 6, i - 5, i - 4));
+            this.faces.push(new THREE.Face3(i - 4, i - 5, i - 3));
+            this.faces.push(new THREE.Face3(i - 8, i - 7, i - 6));
+            this.faces.push(new THREE.Face3(i - 8, i - 5, i - 7));
+            arr.push(this.faces[i]);
+            arr.push(this.faces[i + 1]);
+            arr.push(this.faces[i + 2]);
+            arr.push(this.faces[i + 3]);
+            i += 4;
+        }
+    };

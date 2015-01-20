@@ -19,11 +19,24 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.plotbgGeom = new THREE.Geometry()
     var w = plotter.VIRTUAL_WIDTH;
     var h = w * hToW;
-    this.plotbgGeom.vertices.push(new THREE.Vector3(x + outermargin, y + outermargin, 0),
-        new THREE.Vector3(x + w - outermargin, y + outermargin, 0),
-        new THREE.Vector3(x + w - outermargin, y + h - outermargin, 0),
-        new THREE.Vector3(x + outermargin, y + h - outermargin, 0));
-    this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    var SCREENZ = 0.01;
+    this.plotbgGeom.vertices.push(new THREE.Vector3(x + outermargin, y + outermargin, SCREENZ),
+        new THREE.Vector3(x + w - outermargin, y + outermargin, SCREENZ),
+        new THREE.Vector3(x + w - outermargin, y + h - outermargin, SCREENZ),
+        new THREE.Vector3(x + outermargin, y + h - outermargin, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - 2, SCREENZ),
+        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - 2, SCREENZ),
+        new THREE.Vector3(x + outermargin + this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ));
+        
+    this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 5), new THREE.Face3(5, 4, 0),
+        new THREE.Face3(1, 2, 6), new THREE.Face3(6, 5, 1),
+        new THREE.Face3(2, 8, 6), new THREE.Face3(7, 10, 3), new THREE.Face3(8, 2, 3), new THREE.Face3(3, 10, 8), new THREE.Face3(6, 9, 11), new THREE.Face3(11, 7, 6),
+        new THREE.Face3(7, 3, 0), new THREE.Face3(0, 4, 7));
     var plotbg = new THREE.Mesh(this.plotbgGeom, new THREE.MeshBasicMaterial({color: 0x00ff00}));
     plotter.scene.add(plotbg);
     
@@ -34,13 +47,16 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
         new THREE.Vector3(-this.innermargin.right, -this.innermargin.top, 0),
         new THREE.Vector3(this.innermargin.left, -this.innermargin.top, 0)];
     
-    // draw the plot space
+    // "draw" the plot space. It's transparent but it's needed to detect mouse clicks.
     this.plotspGeom = new THREE.Geometry();
     
     this.plotspGeom.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
     this.resizeToMargins();
     this.plotspGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
-    var plotsp = new THREE.Mesh(this.plotspGeom, new THREE.MeshBasicMaterial({color: 0xffffff}));
+    var material = new THREE.MeshBasicMaterial();
+    material.transparent = true;
+    material.opacity = 0;
+    var plotsp = new THREE.Mesh(this.plotspGeom, material);
     plotter.scene.add(plotsp);
     
     // detect clicks in the plot space
@@ -65,6 +81,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // used to keep track of caching data
     this.drawRequestID = 0;
+    
+    // reuse ShaderMaterials to gain performance
+    this.shaders = {};
 }
 
 /** Just draw the same data again with the new x-axis. In other words, we just
@@ -97,6 +116,11 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var thisRequestID = ++this.drawRequestID;
         var loRequestTime = roundTime(this.xAxis.domainLo.slice(0, 2));
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
+        
+        if (thisRequestID % 10 == 0) {
+            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
+        }
+        
         for (var i = 0; i < numstreams; i++) {
             currUUID = this.plotter.selectedStreams[i].uuid;
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
@@ -107,29 +131,68 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                             
                             // start caching data in advance
                             setTimeout(function () {
-                                    self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
+                                    //self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
                                 }, 1000);
                             
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
                             if (numreplies == numstreams) {
-                                //console.log(self.drawingCache);
-                                //console.log(newDrawingCache);
-                                var cacheUuid, cacheEntry;
-                                for (cacheUuid in newDrawingCache) {
-                                    if (newDrawingCache.hasOwnProperty(cacheUuid)) {
-                                        newDrawingCache[cacheUuid].inPrimaryCache = true;
-                                    }
-                                }
+                                var cacheUuid, cacheEntry, shaders;
+                                // Cleanup work for cache entries that are being removed
                                 for (cacheUuid in self.drawingCache) {
                                     if (self.drawingCache.hasOwnProperty(cacheUuid)) {
+                                        if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
+                                            continue;
+                                        }
                                         cacheEntry = self.drawingCache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
-                                        if (!cacheEntry.inSecondaryCache && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                                        if ((!cacheEntry.inSecondaryCache) && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
+                                            cacheEntry.compressIfPossible();
                                             cacheEntry.freeDrawing();
                                         }
+                                        if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
+                                            continue;
+                                        }
+                                        shaders = self.shaders[cacheUuid];
+                                        shaders[0].dispose();
+                                        shaders[1].dispose();
+                                        delete self.shaders[cacheUuid];
                                     }
                                 }
+                                // Setup work for cache entries that are being added
+                                for (cacheUuid in newDrawingCache) {
+                                    if (newDrawingCache.hasOwnProperty(cacheUuid)) {
+                                        if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
+                                            continue;
+                                        }
+                                        var ce = newDrawingCache[cacheUuid];
+                                        ce.inPrimaryCache = true;
+                                        if (!ce.hasOwnProperty("graph")) {
+                                            ce.cacheDrawing(self.pwe);
+                                        }
+                                        
+                                        if (self.drawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry
+                                            shaders = self.shaders[cacheUuid];
+                                        } else {
+                                            shaders = Cache.makeShaders();
+                                            self.shaders[cacheUuid] = shaders;
+                                        }
+                                        var shader = shaders[0];
+                                        var rangeshader = shaders[1];
+                                        var ddshader = shaders[2];
+                                        shader.attributes.normalVector.value = ce.cached_drawing.normals;
+                                        shader.attributes.timeNanos.value = ce.cached_drawing.timeNanos;
+                                        rangeshader.attributes.timeNanos.value = ce.cached_drawing.rangeTimeNanos;
+                                        ddshader.attributes.normalVector.value = ce.cached_drawing.ddplotnormals;
+                                        ddshader.attributes.timeNanos.value = ce.cached_drawing.ddplotNanos;
+                                        shader.attributes.normalVector.needsUpdate = true;
+                                        shader.attributes.timeNanos.needsUpdate = true;
+                                        rangeshader.attributes.timeNanos.needsUpdate = true;
+                                        ddshader.attributes.normalVector.needsUpdate = true;
+                                        ddshader.attributes.timeNanos.needsUpdate = true;
+                                    }
+                                }
+                                fp = null;
                                 self.drawingCache = newDrawingCache; // replace the first layer of the cache
                                 callback();
                             }
@@ -198,12 +261,12 @@ Plot.prototype.drawGraph2 = function () {
                 data = this.drawingCache[uuid].cached_data;
                 for (k = 0; k < data.length; k++) {
                     for (i = 0; i < data[k].length; i++) {
-		        if (data[k][i][2] < minval) {
-		            minval = data[k][i][2];
-		        }
-		        if (data[k][i][4] > maxval) {
-		            maxval = data[k][i][4];
-		        }
+		                if (data[k][i][2] < minval) {
+		                    minval = data[k][i][2];
+		                }
+		                if (data[k][i][4] > maxval) {
+		                    maxval = data[k][i][4];
+		                }
                     }
                 }
             }
@@ -217,73 +280,118 @@ Plot.prototype.drawGraph2 = function () {
 Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
         var THICKNESS = 0.15;
-        /*var transforms = [];
-        var i, j;
-        transforms.push(new THREE.Vector3(THICKNESS, 0, 0));
-        for (i = 1; i < 6; i++) {
-            transforms[i] = transforms[i - 1].clone();
-            transforms[i].applyMatrix3(this.rotator60);
-        }*/
-        
-        // For now, just draw the visible region.
         var data;
         var rangegraph;
         var mesh;
-        var plot = new THREE.Object3D();
+        var meshNum = 0;
+        if (this.plot == undefined) {
+            this.plot = new THREE.Object3D();
+            this.plotter.scene.add(this.plot);
+        }
         var cacheEntry;
-        var shader;
+        var shaders, shader;
         
         var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
         
-        for (var uuid in this.drawingCache) {
+        var dispSettings;
+        
+        var uuid;
+        
+        var ddPlotMax = -Infinity;
+        
+        for (uuid in this.drawingCache) {
             if (this.drawingCache.hasOwnProperty(uuid)) {
-                cacheEntry = this.drawingCache[uuid];
-                if (!cacheEntry.cached_drawing.hasOwnProperty("graph")) {
-                    // Compute the information we need to draw the graph
-                    cacheDrawing(cacheEntry);
-                }
-                
-                graph = cacheEntry.cached_drawing.rangegraph;
-                shader = cacheEntry.cached_drawing.rangeshader;
-                shader.uniforms.affineMatrix.value = affineMatrix;
-                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
-                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                
-                mesh = new THREE.Mesh(graph, shader);
-                
-                // The stream must always be drawn. I can't just check if it's in view since the
-                // vertices change drastically due to vertex shading.
-                mesh.frustumCulled = false;
-                
-                plot.add(mesh);
-                
-                
-                graph = cacheEntry.cached_drawing.graph;
-                shader = cacheEntry.cached_drawing.shader;
-                shader.uniforms.affineMatrix.value = affineMatrix;
-                shader.uniforms.rot90Matrix.value = this.rotator90;
-                shader.uniforms.thickness.value = THICKNESS;
-                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
-                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                
-                mesh = new THREE.Mesh(graph, shader);
-                
-                // The stream must always be drawn. I can't just check if it's in view since the
-                // vertices change drastically due to vertex shading.
-                mesh.frustumCulled = false;
-                
-                plot.add(mesh);
+                ddPlotMax = Math.max(ddPlotMax, this.drawingCache[uuid].cached_drawing.ddplotMax);
             }
         }
-        if (this.plot != undefined) {
-            this.plotter.scene.remove(this.plot);
+        
+        var ddAxis = new Axis(0, ddPlotMax, this.plotspGeom.vertices[3].y + 2, this.plotspGeom.vertices[3].y + 18);
+        
+        var ddMatrix = getAffineTransformMatrix(this.xAxis, ddAxis);
+        
+        for (uuid in this.drawingCache) {
+            if (this.drawingCache.hasOwnProperty(uuid)) {
+                cacheEntry = this.drawingCache[uuid];
+                cacheEntry.compressIfPossible();
+                
+                shaders = this.shaders[uuid];
+                
+                dispSettings = this.plotter.streamSettings[uuid];
+                
+                graph = cacheEntry.cached_drawing.rangegraph;
+                shader = shaders[1];
+                shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.color.value = dispSettings.color;
+                shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
+                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
+                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                
+                if (meshNum < this.plot.children.length) {
+                    mesh = this.plot.children[meshNum];
+                } else {
+                    mesh = new THREE.Mesh();
+                    mesh.frustumCulled = false;
+                    this.plot.add(mesh);
+                }
+                
+                meshNum++;
+                
+                mesh.geometry = graph;
+                mesh.material = shader;
+                
+                graph = cacheEntry.cached_drawing.graph;
+                shader = shaders[0];
+                shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.color.value = dispSettings.color;
+                shader.uniforms.rot90Matrix.value = this.rotator90;
+                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
+                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                
+                if (meshNum < this.plot.children.length) {
+                    mesh = this.plot.children[meshNum];
+                } else {
+                    mesh = new THREE.Mesh();
+                    mesh.frustumCulled = false;
+                    this.plot.add(mesh);
+                }
+                
+                meshNum++;
+                
+                mesh.geometry = graph;
+                mesh.material = shader;                
+                
+                graph = cacheEntry.cached_drawing.ddplot;
+                shader = shaders[2];
+                shader.uniforms.affineMatrix.value = ddMatrix;
+                shader.uniforms.color.value = dispSettings.color;
+                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
+                shader.uniforms.yDomainLo.value = ddAxis.domainLo;
+                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                
+                if (meshNum < this.plot.children.length) {
+                    mesh = this.plot.children[meshNum];
+                } else {
+                    mesh = new THREE.Mesh();
+                    mesh.frustumCulled = false;
+                    this.plot.add(mesh);
+                }
+                
+                meshNum++;
+                
+                mesh.geometry = graph;
+                mesh.material = shader;    
+            }
         }
-        this.plot = plot;
-        this.plotter.scene.add(plot);
+        for (var i = this.plot.children.length - 1; i >= meshNum; i++) {
+            this.plot.remove(this.plot.children[i]);
+        }
     };
 
 Plot.prototype.resizeToMargins = function () {

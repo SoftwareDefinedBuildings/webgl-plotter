@@ -131,7 +131,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                             
                             // start caching data in advance
                             setTimeout(function () {
-                                    //self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
+                                    self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
                                 }, 1000);
                             
                             newDrawingCache[uuid] = entry;
@@ -183,6 +183,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         shader.attributes.normalVector.value = ce.cached_drawing.normals;
                                         shader.attributes.timeNanos.value = ce.cached_drawing.timeNanos;
                                         rangeshader.attributes.timeNanos.value = ce.cached_drawing.rangeTimeNanos;
+                                        rangeshader.attributes.rangePerturb.value = ce.cached_drawing.rangePerturb;
                                         ddshader.attributes.normalVector.value = ce.cached_drawing.ddplotnormals;
                                         ddshader.attributes.timeNanos.value = ce.cached_drawing.ddplotNanos;
                                         shader.attributes.normalVector.needsUpdate = true;
@@ -321,6 +322,7 @@ Plot.prototype.drawGraph3 = function () {
                 graph = cacheEntry.cached_drawing.rangegraph;
                 shader = shaders[1];
                 shader.uniforms.affineMatrix.value = affineMatrix;
+                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
                 shader.uniforms.color.value = dispSettings.color;
                 shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
                 shader.uniforms.yDomainLo.value = this.yAxis.domainLo;

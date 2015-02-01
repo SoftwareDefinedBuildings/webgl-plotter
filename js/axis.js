@@ -13,6 +13,16 @@ Axis.prototype.unmap = function (y) {
         return this.domainLo + ((y - this.rangeLo) / (this.rangeHi - this.rangeLo)) * (this.domainHi - this.domainLo);
     };
     
+Axis.prototype.setDomain = function (domainLo, domainHi) {
+        this.domainLo = domainLo;
+        this.domainHi = domainHi;
+    };
+    
+Axis.prototype.setRange = function (rangeLo, rangeHi) {
+        this.rangeLo = rangeLo;
+        this.rangeHi = rangeHi;
+    };
+    
 function TimeAxis (domainLo, domainHi, rangeLo, rangeHi) {
     this.domainLo = domainLo;
     this.domainHi = domainHi;

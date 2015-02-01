@@ -256,26 +256,41 @@ Plot.prototype.drawGraph1 = function () {
 Plot.prototype.drawGraph2 = function () {
         // Normally we'd draw the y axes here. For now, I'm going to skip that.
         var data;
-        var i;
-        var maxval = -Infinity;
-        var minval = Infinity;
-        for (var uuid in this.drawingCache) {
-            if (this.drawingCache.hasOwnProperty(uuid)) {
-                data = this.drawingCache[uuid].cached_data;
-                for (k = 0; k < data.length; k++) {
-                    for (i = 0; i < data[k].length; i++) {
-		                if (data[k][i][2] < minval) {
-		                    minval = data[k][i][2];
-		                }
-		                if (data[k][i][4] > maxval) {
-		                    maxval = data[k][i][4];
-		                }
+        var a, i, j, k;
+        var maxval;
+        var minval;
+        var axes = this.plotter.settings.getAxes();
+        var axisstreams;
+        for (j = 0; j < axes.length; j++) {
+            for (a = 0; a < axes[j].streams.length; a++) {
+                if (axes[j].autoscale) {
+                    axisstreams = axes[j].streams;
+                    maxval = -Infinity;
+                    minval = Infinity;
+                    if (this.drawingCache.hasOwnProperty(axisstreams[a].uuid)) {
+                        data  = this.drawingCache[axisstreams[a].uuid].cached_data;
+                        for (k = 0; k < data.length; k++) {
+                            for (i = 0; i < data[k].length; i++) {
+		                        if (data[k][i][2] < minval) {
+		                            minval = data[k][i][2];
+		                        }
+		                        if (data[k][i][4] > maxval) {
+		                            maxval = data[k][i][4];
+		                        }
+                            }
+                        }
+                    }
+                    if (maxval < minval) {
+                        axes[j].setDomain(-10, 10);
+                    } else if (maxval == minval) {
+                        axes[j].setDomain(maxval - 1, minval + 1);
+                    } else {
+                        axes[j].setDomain(minval, maxval);
                     }
                 }
+                axes[j].setRange(this.plotspGeom.vertices[0].y, this.plotspGeom.vertices[3].y);
             }
         }
-        
-        this.yAxis = new Axis(minval, maxval, this.plotspGeom.vertices[0].y, this.plotspGeom.vertices[3].y);
         
         this.drawGraph3();
     };
@@ -294,8 +309,6 @@ Plot.prototype.drawGraph3 = function () {
         var cacheEntry;
         var shaders, shader;
         
-        var affineMatrix = getAffineTransformMatrix(this.xAxis, this.yAxis);
-        
         var dispSettings;
         
         var uuid;
@@ -312,85 +325,93 @@ Plot.prototype.drawGraph3 = function () {
         
         var ddMatrix = getAffineTransformMatrix(this.xAxis, ddAxis);
         
-        for (uuid in this.drawingCache) {
-            if (this.drawingCache.hasOwnProperty(uuid)) {
-                cacheEntry = this.drawingCache[uuid];
-                cacheEntry.compressIfPossible();
-                
-                shaders = this.shaders[uuid];
-                
-                dispSettings = this.plotter.settings.getSettings(uuid);
-                
-                graph = cacheEntry.cached_drawing.rangegraph;
-                shader = shaders[1];
-                shader.uniforms.affineMatrix.value = affineMatrix;
-                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                shader.uniforms.color.value = dispSettings.color;
-                shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
-                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
-                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                
-                if (meshNum < this.plot.children.length) {
-                    mesh = this.plot.children[meshNum];
-                } else {
-                    mesh = new THREE.Mesh();
-                    mesh.frustumCulled = false;
-                    this.plot.add(mesh);
+        var a, j;
+        
+        var axes = this.plotter.settings.getAxes();
+        
+        for (j = 0; j < axes.length; j++) {
+            affineMatrix = getAffineTransformMatrix(this.xAxis, axes[j]);
+            for (a = 0; a < axes[j].streams.length; a++) {
+                uuid = axes[j].streams[a].uuid;
+                if (this.drawingCache.hasOwnProperty(uuid)) {
+                    cacheEntry = this.drawingCache[uuid];
+                    cacheEntry.compressIfPossible();
+                    
+                    shaders = this.shaders[uuid];
+                    
+                    dispSettings = this.plotter.settings.getSettings(uuid);
+                    
+                    graph = cacheEntry.cached_drawing.rangegraph;
+                    shader = shaders[1];
+                    shader.uniforms.affineMatrix.value = affineMatrix;
+                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                    shader.uniforms.color.value = dispSettings.color;
+                    shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
+                    shader.uniforms.yDomainLo.value = axes[j].domainLo;
+                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                    
+                    if (meshNum < this.plot.children.length) {
+                        mesh = this.plot.children[meshNum];
+                    } else {
+                        mesh = new THREE.Mesh();
+                        mesh.frustumCulled = false;
+                        this.plot.add(mesh);
+                    }
+                    
+                    meshNum++;
+                    
+                    mesh.geometry = graph;
+                    mesh.material = shader;
+                    
+                    graph = cacheEntry.cached_drawing.graph;
+                    shader = shaders[0];
+                    shader.uniforms.affineMatrix.value = affineMatrix;
+                    shader.uniforms.color.value = dispSettings.color;
+                    shader.uniforms.rot90Matrix.value = this.rotator90;
+                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                    shader.uniforms.yDomainLo.value = axes[j].domainLo;
+                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                    
+                    if (meshNum < this.plot.children.length) {
+                        mesh = this.plot.children[meshNum];
+                    } else {
+                        mesh = new THREE.Mesh();
+                        mesh.frustumCulled = false;
+                        this.plot.add(mesh);
+                    }
+                    
+                    meshNum++;
+                    
+                    mesh.geometry = graph;
+                    mesh.material = shader;                
+                    
+                    graph = cacheEntry.cached_drawing.ddplot;
+                    shader = shaders[2];
+                    shader.uniforms.affineMatrix.value = ddMatrix;
+                    shader.uniforms.color.value = dispSettings.color;
+                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
+                    shader.uniforms.yDomainLo.value = ddAxis.domainLo;
+                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                    
+                    if (meshNum < this.plot.children.length) {
+                        mesh = this.plot.children[meshNum];
+                    } else {
+                        mesh = new THREE.Mesh();
+                        mesh.frustumCulled = false;
+                        this.plot.add(mesh);
+                    }
+                    
+                    meshNum++;
+                    
+                    mesh.geometry = graph;
+                    mesh.material = shader;
                 }
-                
-                meshNum++;
-                
-                mesh.geometry = graph;
-                mesh.material = shader;
-                
-                graph = cacheEntry.cached_drawing.graph;
-                shader = shaders[0];
-                shader.uniforms.affineMatrix.value = affineMatrix;
-                shader.uniforms.color.value = dispSettings.color;
-                shader.uniforms.rot90Matrix.value = this.rotator90;
-                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                shader.uniforms.yDomainLo.value = this.yAxis.domainLo;
-                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                
-                if (meshNum < this.plot.children.length) {
-                    mesh = this.plot.children[meshNum];
-                } else {
-                    mesh = new THREE.Mesh();
-                    mesh.frustumCulled = false;
-                    this.plot.add(mesh);
-                }
-                
-                meshNum++;
-                
-                mesh.geometry = graph;
-                mesh.material = shader;                
-                
-                graph = cacheEntry.cached_drawing.ddplot;
-                shader = shaders[2];
-                shader.uniforms.affineMatrix.value = ddMatrix;
-                shader.uniforms.color.value = dispSettings.color;
-                shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
-                shader.uniforms.yDomainLo.value = ddAxis.domainLo;
-                shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                
-                if (meshNum < this.plot.children.length) {
-                    mesh = this.plot.children[meshNum];
-                } else {
-                    mesh = new THREE.Mesh();
-                    mesh.frustumCulled = false;
-                    this.plot.add(mesh);
-                }
-                
-                meshNum++;
-                
-                mesh.geometry = graph;
-                mesh.material = shader;    
             }
         }
         for (var i = this.plot.children.length - 1; i >= meshNum; i++) {

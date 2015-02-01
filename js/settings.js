@@ -98,3 +98,7 @@ Settings.prototype.newAxis = function () {
         this.axisMap[newID] = newAxis;
         return newAxis;
     };
+    
+Settings.prototype.getAxes = function () {
+        return this.axes;
+    };

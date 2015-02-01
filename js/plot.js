@@ -106,7 +106,9 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         
         this.pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWide));
         
-        var numstreams = this.plotter.selectedStreams.length;
+        var streams = this.plotter.settings.getStreams();
+        
+        var numstreams = streams.length;
         var numreplies = 0;
         var newDrawingCache = {};
         
@@ -118,11 +120,11 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
         
         if (thisRequestID % 10 == 0) {
-            this.dataCache.limitMemory(this.plotter.selectedStreams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
+            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
         }
         
         for (var i = 0; i < numstreams; i++) {
-            currUUID = this.plotter.selectedStreams[i].uuid;
+            currUUID = streams[i].uuid;
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
                             if (thisRequestID != self.drawRequestID) {
@@ -317,7 +319,7 @@ Plot.prototype.drawGraph3 = function () {
                 
                 shaders = this.shaders[uuid];
                 
-                dispSettings = this.plotter.streamSettings[uuid];
+                dispSettings = this.plotter.settings.getSettings(uuid);
                 
                 graph = cacheEntry.cached_drawing.rangegraph;
                 shader = shaders[1];

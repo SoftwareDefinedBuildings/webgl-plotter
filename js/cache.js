@@ -190,7 +190,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
             halfpwnanos = [0, 0];
         }
         var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
-        var trueEnd = subTimes(subTimes(queryEnd.slice(0), halfpwnanos), [0, 1]); // subtract a nanosecond because we exclude the end time
+        var trueEnd = subTimes(queryEnd.slice(0), halfpwnanos);
         
         if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
             trueEnd[0] = trueStart[0];

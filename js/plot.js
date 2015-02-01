@@ -108,7 +108,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         
         var streams = this.plotter.settings.getStreams();
         
-        var numstreams = streams.length;
+        var numstreams = streams.len;
         var numreplies = 0;
         var newDrawingCache = {};
         
@@ -123,8 +123,8 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
             this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
         }
         
-        for (var i = 0; i < numstreams; i++) {
-            currUUID = streams[i].uuid;
+        for (var streamnode = streams.head; streamnode != null; streamnode = streamnode.next) {
+            currUUID = streamnode.elem.uuid;
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
                             if (thisRequestID != self.drawRequestID) {
@@ -261,14 +261,17 @@ Plot.prototype.drawGraph2 = function () {
         var minval;
         var axes = this.plotter.settings.getAxes();
         var axisstreams;
-        for (j = 0; j < axes.length; j++) {
-            for (a = 0; a < axes[j].streams.length; a++) {
-                if (axes[j].autoscale) {
-                    axisstreams = axes[j].streams;
+        var axisnode, streamnode;
+        var axis, stream;
+        for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
+            axis = axisnode.elem;
+            if (axis.autoscale) {
+                for (streamnode = axis.streams.head; streamnode != null; streamnode = streamnode.next) {
+                    stream = streamnode.elem;
                     maxval = -Infinity;
                     minval = Infinity;
-                    if (this.drawingCache.hasOwnProperty(axisstreams[a].uuid)) {
-                        data  = this.drawingCache[axisstreams[a].uuid].cached_data;
+                    if (this.drawingCache.hasOwnProperty(stream.uuid)) {
+                        data  = this.drawingCache[stream.uuid].cached_data;
                         for (k = 0; k < data.length; k++) {
                             for (i = 0; i < data[k].length; i++) {
 		                        if (data[k][i][2] < minval) {
@@ -281,15 +284,15 @@ Plot.prototype.drawGraph2 = function () {
                         }
                     }
                     if (maxval < minval) {
-                        axes[j].setDomain(-10, 10);
+                        axis.setDomain(-10, 10);
                     } else if (maxval == minval) {
-                        axes[j].setDomain(maxval - 1, minval + 1);
+                        axis.setDomain(maxval - 1, minval + 1);
                     } else {
-                        axes[j].setDomain(minval, maxval);
+                        axis.setDomain(minval, maxval);
                     }
                 }
-                axes[j].setRange(this.plotspGeom.vertices[0].y, this.plotspGeom.vertices[3].y);
             }
+            axis.setRange(this.plotspGeom.vertices[0].y, this.plotspGeom.vertices[3].y);
         }
         
         this.drawGraph3();
@@ -311,8 +314,6 @@ Plot.prototype.drawGraph3 = function () {
         
         var dispSettings;
         
-        var uuid;
-        
         var ddPlotMax = -Infinity;
         
         for (uuid in this.drawingCache) {
@@ -325,14 +326,15 @@ Plot.prototype.drawGraph3 = function () {
         
         var ddMatrix = getAffineTransformMatrix(this.xAxis, ddAxis);
         
-        var a, j;
-        
         var axes = this.plotter.settings.getAxes();
+        var axisnode, streamnode;
+        var axis, uuid;
         
-        for (j = 0; j < axes.length; j++) {
-            affineMatrix = getAffineTransformMatrix(this.xAxis, axes[j]);
-            for (a = 0; a < axes[j].streams.length; a++) {
-                uuid = axes[j].streams[a].uuid;
+        for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
+            axis = axisnode.elem;
+            affineMatrix = getAffineTransformMatrix(this.xAxis, axis);
+            for (streamnode = axis.streams.head; streamnode != null; streamnode = streamnode.next) {
+                uuid = streamnode.elem.uuid;
                 if (this.drawingCache.hasOwnProperty(uuid)) {
                     cacheEntry = this.drawingCache[uuid];
                     cacheEntry.compressIfPossible();
@@ -347,7 +349,7 @@ Plot.prototype.drawGraph3 = function () {
                     shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
                     shader.uniforms.color.value = dispSettings.color;
                     shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
-                    shader.uniforms.yDomainLo.value = axes[j].domainLo;
+                    shader.uniforms.yDomainLo.value = axis.domainLo;
                     shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                     shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
                     shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
@@ -371,7 +373,7 @@ Plot.prototype.drawGraph3 = function () {
                     shader.uniforms.color.value = dispSettings.color;
                     shader.uniforms.rot90Matrix.value = this.rotator90;
                     shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                    shader.uniforms.yDomainLo.value = axes[j].domainLo;
+                    shader.uniforms.yDomainLo.value = axis.domainLo;
                     shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                     shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
                     shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];

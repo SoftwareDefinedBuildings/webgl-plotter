@@ -781,8 +781,8 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
                     if (gap) {
                         if (prevGap && prevPt[2] != prevPt[4]) {
                             // We'll have to perturb things a bit to get a visibly thick vertical line
-                            rangegraph.pop();
-                            rangegraph.pop();
+                            rangegraph.vertices.pop();
+                            rangegraph.vertices.pop();
                             rangePerturb.pop();
                             rangePerturb.pop();
                             rangegraph.vertices.push(rangegraph.vertices[rangegraph.vertices.length - 2]);

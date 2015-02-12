@@ -282,7 +282,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
    and queryEnd, including queryStart but not queryEnd. HALFPWNANOS should be
    Math.pow(2, pointwidthexp - 1). */
 Cache.prototype.makeDataRequest = function (uuid, trueStart, trueEnd, pointwidthexp, callback, caching) {
-        var req = uuid + '?starttime=' + timeToStr(trueStart) + '&endtime=' + timeToStr(trueEnd) + '&unitoftime=ns&pw=' + pointwidthexp;
+        var req = [uuid, trueStart, trueEnd, pointwidthexp];
         if (caching) {
             this.requester.makeDataRequest(req, function (data) {
                     callback(data, trueStart, trueEnd);
@@ -294,14 +294,14 @@ Cache.prototype.makeDataRequest = function (uuid, trueStart, trueEnd, pointwidth
         }
     };
 
-Cache.prototype.queueRequest = function (url, callback, datatype, pwe) {
+Cache.prototype.queueRequest = function (req, callback, datatype, pwe) {
         if (this.pendingRequests == 0) {
             this.currPWE = pwe;
         }
         var self = this;
         if (this.currPWE == pwe) {
             this.pendingRequests++;
-            this.requester.makeDataRequest(url, function (data) {
+            this.requester.makeDataRequest(req, function (data) {
                     self.pendingRequests--;
                     callback(data);
                     if (self.pendingRequests == 0) {
@@ -322,14 +322,14 @@ Cache.prototype.queueRequest = function (url, callback, datatype, pwe) {
             this.pendingSecondaryRequests++;
             var id = setTimeout(function () {
                     if (self.pendingSecondaryRequestData.hasOwnProperty(id)) {
-                        self.requester.makeDataRequest(url, function (data) {
+                        self.requester.makeDataRequest(req, function (data) {
                                 callback(data);
                             }, datatype);
                         self.pendingSecondaryRequests--;
                         delete self.pendingSecondaryRequestData[id];
                     }
                 }, 1000);
-            this.pendingSecondaryRequestData[id] = [url, callback, datatype];
+            this.pendingSecondaryRequestData[id] = [req, callback, datatype];
         }
     };
 

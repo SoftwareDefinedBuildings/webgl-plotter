@@ -14,7 +14,8 @@ Requester.prototype.makeTagsRequest = function (message, success_callback, type,
             });
     };
     
-Requester.prototype.makeDataRequest = function (request_str, success_callback, type, error_callback) {
+Requester.prototype.makeDataRequest = function (request, success_callback, type, error_callback) {
+		var request_str = request[0] + '?starttime=' + timeToStr(request[1]) + '&endtime=' + timeToStr(request[2]) + '&unitoftime=ns&pw=' + request[3];
         return $.ajax({
                 type: "POST",
                 url: 'http://localhost:7856',

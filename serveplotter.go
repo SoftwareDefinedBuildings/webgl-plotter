@@ -13,7 +13,7 @@ type DataRequestHandler struct {}
 
 func (drh DataRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		fmt.Println("You must send a POST request to get data.")
+		w.Write([]byte("You must send a POST request to get data."))
 		return
 	}
 }
@@ -37,6 +37,11 @@ func main() {
 	    return
 	}
 	
-	log.Fatal(http.ListenAndServe(":8080", http.FileServer(http.Dir(directory.(string)))))
+	var drh DataRequestHandler
+	
+	http.Handle("/", http.FileServer(http.Dir(directory.(string))))
+	http.Handle("/data", drh)
+	
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 

@@ -248,7 +248,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
                     if (dataCache.hasOwnProperty(uuid) && dataCache[uuid][pointwidthexp] == cache) { // If the stream or pointwidth has been deleted to limit memory, just return and don't cache
                         var data;
                         try {
-                            data = JSON.parse(streamdata)[0].XReadings;
+                            data = JSON.parse(streamdata);
                         } catch (err) {
                             console.log('Invalid data response from server: ' + err);
                             console.log(streamdata);
@@ -282,7 +282,7 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
    and queryEnd, including queryStart but not queryEnd. HALFPWNANOS should be
    Math.pow(2, pointwidthexp - 1). */
 Cache.prototype.makeDataRequest = function (uuid, trueStart, trueEnd, pointwidthexp, callback, caching) {
-        var req = [uuid, trueStart, trueEnd, pointwidthexp];
+        var req = [uuid, timeToStr(trueStart), timeToStr(trueEnd), pointwidthexp];
         if (caching) {
             this.requester.makeDataRequest(req, function (data) {
                     callback(data, trueStart, trueEnd);

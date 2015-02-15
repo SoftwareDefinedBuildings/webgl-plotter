@@ -15,11 +15,11 @@ Requester.prototype.makeTagsRequest = function (message, success_callback, type,
     };
     
 Requester.prototype.makeDataRequest = function (request, success_callback, type, error_callback) {
-		var request_str = request[0] + '?starttime=' + timeToStr(request[1]) + '&endtime=' + timeToStr(request[2]) + '&unitoftime=ns&pw=' + request[3];
+		var request_str = request.join(',')
         return $.ajax({
                 type: "POST",
-                url: 'http://localhost:7856',
-                data: this.dataURL + request_str,
+                url: 'http://localhost:8080/data',
+                data: request_str,
                 success: success_callback,
                 dataType: type,
                 error: error_callback == undefined ? function () {} : error_callback

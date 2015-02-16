@@ -1,8 +1,9 @@
-USE_WEBSOCKETS = false
+USE_WEBSOCKETS = true
 
 function Requester(tagsURL, dataURL) {
     this.tagsURL = tagsURL;
     this.dataURL = dataURL;
+    this.idleWebSockets = [];
 }
 
 Requester.prototype.makeTagsRequest = function (message, success_callback, type, error_callback) {
@@ -18,15 +19,24 @@ Requester.prototype.makeTagsRequest = function (message, success_callback, type,
     
 Requester.prototype.makeDataRequest = function (request, success_callback, type, error_callback) {
 		var request_str = request.join(',');
+		var ws, self;
 		if (USE_WEBSOCKETS) {
-            var ws = new WebSocket("ws://localhost:8080/dataws")
-        
-            ws.onmessage = function (message) {
-        	    success_callback(message.data)
-                ws.close()
-            }
-        
-            ws.onopen = function () {
+		    self = this;
+		    if (this.idleWebSockets.length == 0) {
+                ws = new WebSocket("ws://localhost:8080/dataws")
+                ws.onopen = function () {
+                    ws.send(request_str)
+                }
+                ws.onmessage = function (message) {
+            	    success_callback(message.data)
+            	    self.idleWebSockets.push(ws)
+                }
+            } else {
+                ws = this.idleWebSockets.shift()
+                ws.onmessage = function (message) {
+            	    success_callback(message.data)
+            	    self.idleWebSockets.push(ws)
+                }
                 ws.send(request_str)
             }
         } else {

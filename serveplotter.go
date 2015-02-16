@@ -16,8 +16,11 @@ import (
 	cparse "github.com/SoftwareDefinedBuildings/sync2_quasar/configparser"
 	cpint "github.com/SoftwareDefinedBuildings/quasar/cpinterface"
 	capnp "github.com/glycerine/go-capnproto"
+	ws "github.com/gorilla/websocket"
 	uuid "code.google.com/p/go-uuid/uuid"
 )
+
+var upgrader = ws.Upgrader{}
 
 type QueryMessagePart struct {
 	segment *capnp.Segment
@@ -39,6 +42,36 @@ var queryPool sync.Pool = sync.Pool{
 	},
 }
 
+type Writable interface {
+	GetWriter () io.Writer
+}
+
+type RespWrapper struct {
+	wr http.ResponseWriter
+}
+
+func (rw RespWrapper) GetWriter() io.Writer {
+	return rw.wr
+}
+
+type ConnWrapper struct {
+	writing *sync.Mutex
+	conn *ws.Conn
+	currWriter io.WriteCloser
+}
+
+func (cw *ConnWrapper) GetWriter() io.Writer {
+	cw.writing.Lock()
+	w, err := cw.conn.NextWriter(ws.TextMessage)
+	if err == nil {
+		cw.currWriter = w
+		return w
+	} else {
+		fmt.Printf("Could not get writer on WebSocket: %v", err)
+		return nil
+	}
+}
+
 /** DataRequester encapsulates a series of connections used for obtaining data
     from QUASAR. */
 type DataRequester struct {
@@ -49,7 +82,7 @@ type DataRequester struct {
 	pending uint32
 	maxPending uint32
 	pendingLock *sync.Mutex
-	responseWriters map[uint64]io.Writer
+	responseWriters map[uint64]Writable
 	synchronizers map[uint64]chan bool
 	alive bool
 }
@@ -80,7 +113,7 @@ func NewDataRequester(dbAddr string, numConnections int, maxPending uint32) *Dat
 		pending: 0,
 		maxPending: maxPending,
 		pendingLock: &sync.Mutex{},
-		responseWriters: make(map[uint64]io.Writer),
+		responseWriters: make(map[uint64]Writable),
 		synchronizers: make(map[uint64]chan bool),
 		alive: true,
 	}
@@ -93,7 +126,7 @@ func NewDataRequester(dbAddr string, numConnections int, maxPending uint32) *Dat
 }
 
 /* Makes a request for data and writes the result to the specified Writer. */
-func (dr *DataRequester) MakeDataRequest(uuidBytes uuid.UUID, startTime int64, endTime int64, pw uint8, w io.Writer) {
+func (dr *DataRequester) MakeDataRequest(uuidBytes uuid.UUID, startTime int64, endTime int64, pw uint8, writ Writable) {
 	for true {
 		dr.pendingLock.Lock()
 		if dr.pending < dr.maxPending {
@@ -129,7 +162,7 @@ func (dr *DataRequester) MakeDataRequest(uuidBytes uuid.UUID, startTime int64, e
 	cid := atomic.AddUint32(&dr.connID, 1) % uint32(len(dr.connections))
 	
 	dr.sendLocks[cid].Lock()
-	dr.responseWriters[id] = w
+	dr.responseWriters[id] = writ
 	dr.synchronizers[id] = make(chan bool)
 	_, sendErr := segment.WriteTo(dr.connections[cid])
 	dr.sendLocks[cid].Unlock()
@@ -140,7 +173,9 @@ func (dr *DataRequester) MakeDataRequest(uuidBytes uuid.UUID, startTime int64, e
 	queryPool.Put(mp)
 	
 	if sendErr != nil {
+		w := writ.GetWriter()
 		w.Write([]byte(fmt.Sprintf("Could not send query to database: %v", sendErr)))
+		return
 	}
 	
 	<- dr.synchronizers[id]
@@ -167,7 +202,9 @@ func (dr *DataRequester) handleDataResponse(connection net.Conn) {
 		status := responseSeg.StatusCode()
 		records := responseSeg.StatisticalRecords().Values()
 		
-		w := dr.responseWriters[id]
+		writ := dr.responseWriters[id]
+		
+		w := writ.GetWriter()
 		
 		if status != cpint.STATUSCODE_OK {
 			w.Write([]byte(fmt.Sprintf("Database returns status code %v", status)))
@@ -208,6 +245,55 @@ func (dr *DataRequester) stop() {
 	dr.alive = false
 }
 
+func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, startTime int64, endTime int64, pw uint8, success bool) {
+	var args []string = strings.Split(string(request), ",")
+	var err error
+	
+	success = false
+	var w io.Writer
+
+	if len(args) != 4 {
+		w = writ.GetWriter()
+		w.Write([]byte(fmt.Sprintf("Four arguments are required; got %v", len(args))))
+		return
+	}
+
+	uuidBytes = uuid.Parse(args[0])
+
+	if uuidBytes == nil {
+		w = writ.GetWriter()
+		w.Write([]byte(fmt.Sprintf("Invalid UUID: got %v", args[0])))
+		return
+	}
+	var pwTemp int64
+
+	startTime, err = strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		w = writ.GetWriter()
+		w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int64: %v", args[1], err)))
+		return
+	}
+
+	endTime, err = strconv.ParseInt(args[2], 10, 64)
+	if err != nil {
+		w = writ.GetWriter()
+		w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int64: %v", args[2], err)))
+		return
+	}
+
+	pwTemp, err = strconv.ParseInt(args[3], 10, 16)
+	if err != nil {
+		w = writ.GetWriter()
+		w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int16: %v", args[3], err)))
+		return
+	}
+	
+	pw = uint8(pwTemp)
+	success = true
+	
+	return
+}
+
 func main() {
 	configfile, err := ioutil.ReadFile("plotter.ini")
 	if err != nil {
@@ -230,6 +316,37 @@ func main() {
 	var dr *DataRequester = NewDataRequester("localhost:4410", 2, 8)
 	
 	http.Handle("/", http.FileServer(http.Dir(directory.(string))))
+	http.HandleFunc("/dataws", func (w http.ResponseWriter, r *http.Request) {
+		websocket, upgradeerr := upgrader.Upgrade(w, r, nil)
+		if upgradeerr != nil {
+			// TODO Perhaps we could redirect somehow?
+			w.Write([]byte(fmt.Sprintf("Could not upgrade HTTP connection to WebSocket: %v\n", upgradeerr)))
+			return
+		}
+		
+		cw := ConnWrapper{
+			writing: &sync.Mutex{},
+			conn: websocket,
+		}
+		
+		for {
+			_, payload, err := websocket.ReadMessage()
+			
+			if err != nil {
+				return // Most likely the connection was closed
+			}
+			
+			uuidBytes, startTime, endTime, pw, success := parseDataRequest(string(payload), &cw)
+		
+			if success {
+				dr.MakeDataRequest(uuidBytes, startTime, endTime, uint8(pw), &cw)
+			}
+			if cw.currWriter != nil {
+				cw.currWriter.Close()
+			}
+			cw.writing.Unlock()
+		}
+	});
 	http.HandleFunc("/data", func (w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			w.Write([]byte("You must send a POST request to get data."))
@@ -241,44 +358,14 @@ func main() {
 		if err != nil {
 			w.Write([]byte(fmt.Sprintf("Could not read received POST payload: %v", err)))
 		}
-
-		var args []string = strings.Split(string(payload), ",")
-
-		if len(args) != 4 {
-			w.Write([]byte(fmt.Sprintf("Four arguments are required; got %v", len(args))))
-			return
+		
+		wrapper := RespWrapper{w}
+		
+		uuidBytes, startTime, endTime, pw, success := parseDataRequest(string(payload), wrapper)
+		
+		if success {
+			dr.MakeDataRequest(uuidBytes, startTime, endTime, uint8(pw), wrapper)
 		}
-
-		var uuidBytes uuid.UUID = uuid.Parse(args[0])
-
-		if uuidBytes == nil {
-			w.Write([]byte(fmt.Sprintf("Invalid UUID: got %v", args[0])))
-			return
-		}
-
-		var startTime int64
-		var endTime int64
-		var pw int64
-
-		startTime, err = strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int64: %v", args[1], err)))
-			return
-		}
-
-		endTime, err = strconv.ParseInt(args[2], 10, 64)
-		if err != nil {
-			w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int64: %v", args[2], err)))
-			return
-		}
-
-		pw, err = strconv.ParseInt(args[3], 10, 16)
-		if err != nil {
-			w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int16: %v", args[3], err)))
-			return
-		}
-
-		dr.MakeDataRequest(uuidBytes, startTime, endTime, uint8(pw), w)
 	})
 	
 	log.Fatal(http.ListenAndServe(":8080", nil))

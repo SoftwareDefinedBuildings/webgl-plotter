@@ -184,13 +184,13 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
         
         /* queryStart and queryEnd are the start and end of the query I want,
         in terms of the midpoints of the intervals I get back; the real archiver
-        will give me back all intervals that touch the query range. So I shrink
-        the range by half a pointwidth on each side to compensate for that. */
+        will interpret the query in terms of the start times of the intervals. So
+        I add a constant to the start and end times. */
         if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
             halfpwnanos = [0, 0];
         }
         var trueStart = addTimes(queryStart.slice(0), halfpwnanos);
-        var trueEnd = subTimes(queryEnd.slice(0), halfpwnanos);
+        var trueEnd = addTimes(queryEnd.slice(0), halfpwnanos);
         
         if (cmpTimes(trueEnd, trueStart) <= 0) { // it's possible for this to happen, if the range is smaller than an interval
             trueEnd[0] = trueStart[0];

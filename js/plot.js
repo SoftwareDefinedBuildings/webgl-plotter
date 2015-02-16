@@ -120,7 +120,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
         
         if (thisRequestID % 10 == 0) {
-            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 50000, 25000);
+            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 500000, 250000);
         }
         
         for (var streamnode = streams.head; streamnode != null; streamnode = streamnode.next) {
@@ -215,29 +215,44 @@ Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endT
         var self = this;
         var leftStart = subTimes(startTime.slice(0), sideCache);
         var rightEnd = addTimes(sideCache, endTime);
-        self.dataCache.getData(uuid, pwe, leftStart.slice(0), startTime.slice(0), function () {
-                if (drawID != self.drawRequestID) {
-                    return;
-                }
-                self.dataCache.getData(uuid, pwe, endTime.slice(0), rightEnd.slice(0), function () {
-                        if (drawID != self.drawRequestID || pwe == 0) {
+        var firstLevel = 2
+            
+        var cacheRest = function () {
+                self.dataCache.getData(uuid, pwe - 1, leftStart.slice(0), rightEnd.slice(0), function () {
+                        if (drawID != self.drawRequestID || pwe == 1) {
                             return;
                         }
-                        self.dataCache.getData(uuid, pwe - 1, leftStart.slice(0), rightEnd.slice(0), function () {
-                                if (drawID != self.drawRequestID || pwe == 1) {
+                        self.dataCache.getData(uuid, pwe + 1, leftStart.slice(0), rightEnd.slice(0), function () {
+                                if (drawID != self.drawRequestID) {
                                     return;
                                 }
-                                self.dataCache.getData(uuid, pwe + 1, leftStart.slice(0), rightEnd.slice(0), function () {
-                                        if (drawID != self.drawRequestID) {
-                                            return;
-                                        }
-                                        self.dataCache.getData(uuid, pwe - 2, leftStart.slice(0), rightEnd.slice(0), function () {
-                                                // Any GUI work to notify the user that caching is complete should be done here
-                                            }, true);
+                                self.dataCache.getData(uuid, pwe - 2, leftStart.slice(0), rightEnd.slice(0), function () {
+                                        // Any GUI work to notify the user that caching is complete should be done here
                                     }, true);
                             }, true);
                     }, true);
+            };
+            
+        self.dataCache.getData(uuid, pwe, endTime.slice(0), rightEnd.slice(0), function (ce) {
+                if (drawID != self.drawRequestID || pwe == 0) {
+                    return;
+                }
+                firstLevel--;
+                if (firstLevel == 0) {
+                    cacheRest()
+                }
             }, true);
+            
+        self.dataCache.getData(uuid, pwe, leftStart.slice(0), startTime.slice(0), function (ce) {
+                if (drawID != self.drawRequestID) {
+                    return;
+                }
+                firstLevel--;
+                if (firstLevel == 0) {
+                    cacheRest()
+                }
+            }, true);
+            
     };
     
 
@@ -457,6 +472,10 @@ Plot.prototype.recomputePixelsWideIfNecessary = function () {
     
 Plot.prototype.startDrag = function () {
         this.scrolling = true;
+        var self = this;
+        this.fullUpdate(function () {
+                self.drawGraph3();
+            }, true);
     };
     
 Plot.prototype.stopDrag = function () {

@@ -287,8 +287,12 @@ func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, start
 		w.Write([]byte(fmt.Sprintf("Could not interpret %v as an int16: %v", args[3], err)))
 		return
 	}
-	
+
 	pw = uint8(pwTemp)
+	
+	startTime = ((startTime >> pw) << pw)
+	endTime = ((endTime >> pw) << pw)
+	
 	success = true
 	
 	return

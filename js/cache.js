@@ -185,7 +185,14 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
         /* queryStart and queryEnd are the start and end of the query I want,
         in terms of the midpoints of the intervals I get back; the real archiver
         will interpret the query in terms of the start times of the intervals. So
-        I add a constant to the start and end times. */
+        I add a constant to the start and end times.
+        QUASAR rounds down the endtime and then treats it as exclusive; that makes
+        things more difficult, since now I can't use the endtime as the data_end of
+        each cache entry; I have to first make the query with endtime + 2 ^ pw, and
+        then use endtime - 2 ^ pw in the cacheEntry, since otherwise I'll miss the last
+        point in each entry. The backend will add 2 ^ pw to each endtime to account for
+        this, so as far as the cache is concerned, data is provided with the endtime
+        rounded down and then treated as inclusive.*/
         if (pointwidthexp == 0) { // edge case. We don't want to deal with half nanoseconds
             halfpwnanos = [0, 0];
         }
@@ -371,6 +378,7 @@ Cache.prototype.insertData = function (uuid, cache, data, dataStart, dataEnd, ca
             callback(cache[i]);
             return;
         }
+        
         var dataBefore;
         var dataAfter;
         var cacheStart;

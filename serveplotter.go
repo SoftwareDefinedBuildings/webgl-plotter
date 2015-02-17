@@ -291,7 +291,7 @@ func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, start
 	pw = uint8(pwTemp)
 	
 	startTime = ((startTime >> pw) << pw)
-	endTime = ((endTime >> pw) << pw)
+	endTime = (((endTime >> pw) + 1) << pw) // we add one pointwidth to the endtime to simulate an inclusive endpoint
 	
 	success = true
 	

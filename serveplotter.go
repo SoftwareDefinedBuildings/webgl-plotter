@@ -55,16 +55,16 @@ func (rw RespWrapper) GetWriter() io.Writer {
 }
 
 type ConnWrapper struct {
-	writing *sync.Mutex
-	conn *ws.Conn
-	currWriter io.WriteCloser
+	Writing *sync.Mutex
+	Conn *ws.Conn
+	CurrWriter io.WriteCloser
 }
 
 func (cw *ConnWrapper) GetWriter() io.Writer {
-	cw.writing.Lock()
-	w, err := cw.conn.NextWriter(ws.TextMessage)
+	cw.Writing.Lock()
+	w, err := cw.Conn.NextWriter(ws.TextMessage)
 	if err == nil {
-		cw.currWriter = w
+		cw.CurrWriter = w
 		return w
 	} else {
 		fmt.Printf("Could not get writer on WebSocket: %v", err)
@@ -245,17 +245,21 @@ func (dr *DataRequester) stop() {
 	dr.alive = false
 }
 
-func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, startTime int64, endTime int64, pw uint8, success bool) {
+func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, startTime int64, endTime int64, pw uint8, extra string, success bool) {
 	var args []string = strings.Split(string(request), ",")
 	var err error
 	
 	success = false
 	var w io.Writer
 
-	if len(args) != 4 {
+	if len(args) != 4 && len(args) != 5 {
 		w = writ.GetWriter()
-		w.Write([]byte(fmt.Sprintf("Four arguments are required; got %v", len(args))))
+		w.Write([]byte(fmt.Sprintf("Four or five arguments are required; got %v", len(args))))
 		return
+	}
+	
+	if len(args) == 5 {
+	    extra = args[4]
 	}
 
 	uuidBytes = uuid.Parse(args[0])
@@ -329,8 +333,8 @@ func main() {
 		}
 		
 		cw := ConnWrapper{
-			writing: &sync.Mutex{},
-			conn: websocket,
+			Writing: &sync.Mutex{},
+			Conn: websocket,
 		}
 		
 		for {
@@ -340,15 +344,29 @@ func main() {
 				return // Most likely the connection was closed
 			}
 			
-			uuidBytes, startTime, endTime, pw, success := parseDataRequest(string(payload), &cw)
+			uuidBytes, startTime, endTime, pw, echoTag, success := parseDataRequest(string(payload), &cw)
 		
 			if success {
 				dr.MakeDataRequest(uuidBytes, startTime, endTime, uint8(pw), &cw)
 			}
-			if cw.currWriter != nil {
-				cw.currWriter.Close()
+			if cw.CurrWriter != nil {
+				cw.CurrWriter.Close()
 			}
-			cw.writing.Unlock()
+			
+			writer, err := websocket.NextWriter(ws.TextMessage)
+			if err != nil {
+			    fmt.Println("Could not echo tag to client")
+			}
+			
+			if cw.CurrWriter != nil {
+			    _, err = writer.Write([]byte(echoTag))
+				if err != nil {
+					fmt.Println("Could not echo tag to client")
+				}
+				writer.Close()
+			}
+			
+			cw.Writing.Unlock()
 		}
 	});
 	http.HandleFunc("/data", func (w http.ResponseWriter, r *http.Request) {
@@ -365,7 +383,7 @@ func main() {
 		
 		wrapper := RespWrapper{w}
 		
-		uuidBytes, startTime, endTime, pw, success := parseDataRequest(string(payload), wrapper)
+		uuidBytes, startTime, endTime, pw, _, success := parseDataRequest(string(payload), wrapper)
 		
 		if success {
 			dr.MakeDataRequest(uuidBytes, startTime, endTime, uint8(pw), wrapper)

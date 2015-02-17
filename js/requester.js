@@ -1,9 +1,49 @@
 USE_WEBSOCKETS = true
 
+function DataConn(url) {
+    this.ws = new WebSocket(url);
+    this.openMessages = {};
+    this.currMessage = 0;
+    this.currResponse = null;
+    this.ready = false;
+    var self = this;
+    this.ws.onopen = function () {
+            self.ready = true;
+        };
+    this.ws.onmessage = function (response) {
+            response = response.data;
+            if (self.currResponse === null) {
+                self.currResponse = response;
+            } else {
+                var callback = self.openMessages[response];
+                delete self.openMessages[response];
+                var response = self.currResponse;
+                self.currResponse = null;
+                callback(response);
+            }
+        };
+}
+
+DataConn.prototype.send = function(message, callback) {
+    if (this.ready) {
+        this.openMessages[this.currMessage] = callback;
+        this.ws.send(message + "," + this.currMessage++);
+        if (this.currMessage > 2000000) {
+            this.currMessage = 0;
+        }
+    } else {
+        console.log("WebSocket is not ready yet.");
+    }
+}
+
 function Requester(tagsURL, dataURL) {
     this.tagsURL = tagsURL;
     this.dataURL = dataURL;
-    this.idleWebSockets = [];
+    this.connections = [];
+    for (var i = 0; i < 8; i++) {
+        this.connections.push(new DataConn("ws://localhost:8080/dataws"))
+    }
+    this.currConnection = 0;
 }
 
 Requester.prototype.makeTagsRequest = function (message, success_callback, type, error_callback) {
@@ -19,26 +59,11 @@ Requester.prototype.makeTagsRequest = function (message, success_callback, type,
     
 Requester.prototype.makeDataRequest = function (request, success_callback, type, error_callback) {
 		var request_str = request.join(',');
-		var ws, self;
 		if (USE_WEBSOCKETS) {
-		    self = this;
-		    if (this.idleWebSockets.length == 0) {
-                ws = new WebSocket("ws://localhost:8080/dataws")
-                ws.onopen = function () {
-                    ws.send(request_str)
-                }
-                ws.onmessage = function (message) {
-            	    success_callback(message.data)
-            	    self.idleWebSockets.push(ws)
-                }
-            } else {
-                ws = this.idleWebSockets.shift()
-                ws.onmessage = function (message) {
-            	    success_callback(message.data)
-            	    self.idleWebSockets.push(ws)
-                }
-                ws.send(request_str)
-            }
+		    this.connections[this.currConnection++].send(request_str, success_callback);
+		    if (this.currConnection == 8) {
+		        this.currConnection = 0;
+		    }
         } else {
             return $.ajax({
                     type: "POST",

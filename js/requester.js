@@ -41,7 +41,7 @@ function Requester(tagsURL, dataURL) {
     this.dataURL = dataURL;
     this.connections = [];
     for (var i = 0; i < 8; i++) {
-        this.connections.push(new DataConn("ws://localhost:8080/dataws"))
+        this.connections.push(new DataConn("wss://localhost:8080/dataws"))
     }
     this.currConnection = 0;
 }
@@ -49,7 +49,7 @@ function Requester(tagsURL, dataURL) {
 Requester.prototype.makeTagsRequest = function (message, success_callback, type, error_callback) {
         return $.ajax({
                 type: "POST",
-                url: 'http://localhost:7856',
+                url: 'https://localhost:7856',
                 data: 'SENDPOST ' + this.tagsURL + ' ' + message,
                 success: success_callback,
                 dataType: type,
@@ -67,7 +67,7 @@ Requester.prototype.makeDataRequest = function (request, success_callback, type,
         } else {
             return $.ajax({
                     type: "POST",
-                    url: 'http://localhost:8080/data',
+                    url: 'https://localhost:8080/data',
                     data: request_str,
                     success: success_callback,
                     dataType: type,

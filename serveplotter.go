@@ -315,13 +315,25 @@ func main() {
         return
     }
     
+    port, ok := config["port"]
+	if !ok {
+	    fmt.Println("Configuration file is missing required key \"port\"")
+	    return
+	}
+    
+    dbaddr, ok := config["db_addr"]
+    if !ok {
+        fmt.Println("Configuration file is missing required key \"db_addr\"")
+        return
+    }
+    
 	directory, ok := config["plotter_dir"]
 	if !ok {
 	    fmt.Println("Configuration file is missing required key \"plotter_dir\"")
 	    return
 	}
 	
-	var dr *DataRequester = NewDataRequester("localhost:4410", 2, 8)
+	var dr *DataRequester = NewDataRequester(dbaddr.(string), 2, 8)
 	
 	http.Handle("/", http.FileServer(http.Dir(directory.(string))))
 	http.HandleFunc("/dataws", func (w http.ResponseWriter, r *http.Request) {
@@ -390,6 +402,16 @@ func main() {
 		}
 	})
 	
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	
+	var portStr string = fmt.Sprintf(":%v", port)
+	
+	certFile, ok1 := config["cert_file"]
+	keyFile, ok2 := config["key_file"]
+	if ok1 && ok2 {
+		log.Fatal(http.ListenAndServeTLS(portStr, certFile.(string), keyFile.(string), nil))
+	} else {
+		fmt.Println("Not using TLS: cert_file and key_file not specified in plotter.ini")
+		log.Fatal(http.ListenAndServe(portStr, nil))
+	}
 }
 

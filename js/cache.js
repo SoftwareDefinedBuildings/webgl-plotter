@@ -870,6 +870,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         normals.push(Cache.zNormal);
         normals.push(Cache.zNormal);
         
+        cacheEntry.cached_drawing.pwe = pwe;
         cacheEntry.cached_drawing.graph = graph;
         cacheEntry.cached_drawing.rangegraph = rangegraph;
         cacheEntry.cached_drawing.ddplot = ddplot
@@ -930,7 +931,8 @@ Cache.makeShaders = function () {
                 "yDomainLo": {type: 'f'},
                 "xDomainLo1000": {type: 'f'},
                 "xDomainLoMillis": {type: 'f'},
-                "xDomainLoNanos": {type: 'f'}
+                "xDomainLoNanos": {type: 'f'},
+                "horizPixelShift": {type: 'f'}
                 },
             attributes: {
                 "normalVector": {type: 'v3'},
@@ -944,6 +946,7 @@ Cache.makeShaders = function () {
                 uniform float xDomainLo1000; \
                 uniform float xDomainLoMillis; \
                 uniform float xDomainLoNanos; \
+                uniform float horizPixelShift; \
                 attribute vec3 normalVector; \
                 attribute float timeNanos; \
                 float trueThickness; \
@@ -959,6 +962,7 @@ Cache.makeShaders = function () {
                     float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
                     vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
                     vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(trueThickness * normalize(rot90Matrix * mat3(affineMatrix) * trueNormal), 0.0); \
+                    newPosition.x += horizPixelShift; \
                     gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                  } \
                  ",
@@ -979,7 +983,8 @@ Cache.makeShaders = function () {
                     "yDomainLo": {type: 'f'},
                     "xDomainLo1000": {type: 'f'},
                     "xDomainLoMillis": {type: 'f'},
-                    "xDomainLoNanos": {type: 'f'}
+                    "xDomainLoNanos": {type: 'f'},
+                    "horizPixelShift": {type: 'f'}
                     },
                 attributes: {
                     "timeNanos": {type: 'f'},
@@ -992,12 +997,13 @@ Cache.makeShaders = function () {
                     uniform float xDomainLo1000; \
                     uniform float xDomainLoMillis; \
                     uniform float xDomainLoNanos; \
+                    uniform float horizPixelShift; \
                     attribute float timeNanos; \
                     attribute float rangePerturb; \
                     void main() { \
                         float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
                         vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0); \
-                        newPosition.x += rangePerturb * thickness; \
+                        newPosition.x += (horizPixelShift + rangePerturb * thickness); \
                         gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                      } \
                      ",

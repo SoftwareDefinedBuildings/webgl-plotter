@@ -123,6 +123,8 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
             this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 500000, 250000);
         }
         
+        var pwe = this.pwe
+        
         for (var streamnode = streams.head; streamnode != null; streamnode = streamnode.next) {
             currUUID = streamnode.elem.uuid;
             this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
@@ -170,7 +172,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         var ce = newDrawingCache[cacheUuid];
                                         ce.inPrimaryCache = true;
                                         if (!ce.hasOwnProperty("graph")) {
-                                            ce.cacheDrawing(self.pwe);
+                                            ce.cacheDrawing(pwe);
                                         }
                                         
                                         if (self.drawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry
@@ -345,6 +347,8 @@ Plot.prototype.drawGraph3 = function () {
         var axisnode, streamnode;
         var axis, uuid;
         
+        var pwe, timeDelta, pixelShift;
+        
         for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
             axis = axisnode.elem;
             affineMatrix = getAffineTransformMatrix(this.xAxis, axis);
@@ -358,6 +362,12 @@ Plot.prototype.drawGraph3 = function () {
                     
                     dispSettings = this.plotter.settings.getSettings(uuid);
                     
+                    pwe = cacheEntry.cached_drawing.pwe;
+                    
+                    timeDelta = expToPW(pwe - 1);
+                    
+                    pixelShift = this.xAxis.map(addTimes(this.xAxis.domainLo.slice(0, 2), timeDelta)) - this.xAxis.rangeLo;
+                    
                     if (cacheEntry.getLength() != 0) {
                         graph = cacheEntry.cached_drawing.rangegraph;
                         shader = shaders[1];
@@ -369,6 +379,7 @@ Plot.prototype.drawGraph3 = function () {
                         shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                         shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
                         shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                        shader.uniforms.horizPixelShift.value = pixelShift;
                         
                         if (meshNum < this.plot.children.length) {
                             mesh = this.plot.children[meshNum];
@@ -393,6 +404,7 @@ Plot.prototype.drawGraph3 = function () {
                         shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
                         shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
                         shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                        shader.uniforms.horizPixelShift.value = pixelShift;
                         
                         if (meshNum < this.plot.children.length) {
                             mesh = this.plot.children[meshNum];

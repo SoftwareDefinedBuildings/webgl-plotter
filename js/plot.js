@@ -358,53 +358,55 @@ Plot.prototype.drawGraph3 = function () {
                     
                     dispSettings = this.plotter.settings.getSettings(uuid);
                     
-                    graph = cacheEntry.cached_drawing.rangegraph;
-                    shader = shaders[1];
-                    shader.uniforms.affineMatrix.value = affineMatrix;
-                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                    shader.uniforms.color.value = dispSettings.color;
-                    shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
-                    shader.uniforms.yDomainLo.value = axis.domainLo;
-                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                    
-                    if (meshNum < this.plot.children.length) {
-                        mesh = this.plot.children[meshNum];
-                    } else {
-                        mesh = new THREE.Mesh();
-                        mesh.frustumCulled = false;
-                        this.plot.add(mesh);
+                    if (cacheEntry.getLength() != 0) {
+                        graph = cacheEntry.cached_drawing.rangegraph;
+                        shader = shaders[1];
+                        shader.uniforms.affineMatrix.value = affineMatrix;
+                        shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                        shader.uniforms.color.value = dispSettings.color;
+                        shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
+                        shader.uniforms.yDomainLo.value = axis.domainLo;
+                        shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                        shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                        shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                        
+                        if (meshNum < this.plot.children.length) {
+                            mesh = this.plot.children[meshNum];
+                        } else {
+                            mesh = new THREE.Mesh();
+                            mesh.frustumCulled = false;
+                            this.plot.add(mesh);
+                        }
+                        
+                        meshNum++;
+                        
+                        mesh.geometry = graph;
+                        mesh.material = shader;
+                        
+                        graph = cacheEntry.cached_drawing.graph;
+                        shader = shaders[0];
+                        shader.uniforms.affineMatrix.value = affineMatrix;
+                        shader.uniforms.color.value = dispSettings.color;
+                        shader.uniforms.rot90Matrix.value = this.rotator90;
+                        shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                        shader.uniforms.yDomainLo.value = axis.domainLo;
+                        shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
+                        shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
+                        shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                        
+                        if (meshNum < this.plot.children.length) {
+                            mesh = this.plot.children[meshNum];
+                        } else {
+                            mesh = new THREE.Mesh();
+                            mesh.frustumCulled = false;
+                            this.plot.add(mesh);
+                        }
+                        
+                        meshNum++;
+                        
+                        mesh.geometry = graph;
+                        mesh.material = shader;
                     }
-                    
-                    meshNum++;
-                    
-                    mesh.geometry = graph;
-                    mesh.material = shader;
-                    
-                    graph = cacheEntry.cached_drawing.graph;
-                    shader = shaders[0];
-                    shader.uniforms.affineMatrix.value = affineMatrix;
-                    shader.uniforms.color.value = dispSettings.color;
-                    shader.uniforms.rot90Matrix.value = this.rotator90;
-                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                    shader.uniforms.yDomainLo.value = axis.domainLo;
-                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                    
-                    if (meshNum < this.plot.children.length) {
-                        mesh = this.plot.children[meshNum];
-                    } else {
-                        mesh = new THREE.Mesh();
-                        mesh.frustumCulled = false;
-                        this.plot.add(mesh);
-                    }
-                    
-                    meshNum++;
-                    
-                    mesh.geometry = graph;
-                    mesh.material = shader;                
                     
                     graph = cacheEntry.cached_drawing.ddplot;
                     shader = shaders[2];

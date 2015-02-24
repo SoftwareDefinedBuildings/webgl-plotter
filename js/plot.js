@@ -13,11 +13,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.outermargin = outermargin;
     this.hToW = hToW;
     
-    this.innermargin = {left: 20, right: 20, top: 20, bottom: 20};
-    this.ddplottopmargin = 2;
-    this.ddplotbottommargin = 2;
-    this.wvplottopmargin = 2;
-    this.wvplotbottommargin = 2;
+    this.plotmargin = {left: 20, right: 20, top: 20, bottom: 20};
+    this.ddplotmargin = {top: 2, bottom: 2}; // left and right are shared with plot margin, since these will always be aligned
+    this.wvplotmargin = {top: 2, bottom: 2, left: 20, right: 20}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
     
     // draw the chart area
     this.plotbgGeom = new THREE.Geometry()
@@ -32,22 +30,22 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
             new THREE.Vector3(x + outermargin, y + h - outermargin, SCREENZ),
             
             // four plot corner vertices (4 - 7): bl, br, tr, tl
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom, SCREENZ),
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom, SCREENZ),
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.plotmargin.left, y + outermargin + this.plotmargin.bottom, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.plotmargin.right, y + outermargin + this.plotmargin.bottom, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.plotmargin.right, y + h - outermargin - this.plotmargin.top, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.plotmargin.left, y + h - outermargin - this.plotmargin.top, SCREENZ),
             
             // four ddplot corner vertices (8 - 11): tr, br, tl, bl
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.ddplottopmargin, SCREENZ),
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + this.ddplotbottommargin, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.ddplottopmargin, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top + this.ddplotbottommargin, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.plotmargin.right, y + h - outermargin - this.ddplotmargin.top, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.plotmargin.right, y + h - outermargin - this.plotmargin.top + this.ddplotmargin.bottom, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.plotmargin.left, y + h - outermargin - this.ddplotmargin.top, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.plotmargin.left, y + h - outermargin - this.plotmargin.top + this.ddplotmargin.bottom, SCREENZ),
             
             // four wrplot corner vertices (12 - 15): tr, br, tl, bl
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom - this.wvplottopmargin, SCREENZ),
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.wvplotbottommargin, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom - this.wvplottopmargin, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.wvplotbottommargin, SCREENZ)
+            new THREE.Vector3(x + w - outermargin - this.wvplotmargin.right, y + outermargin + this.plotmargin.bottom - this.wvplotmargin.top, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.wvplotmargin.right, y + outermargin + this.wvplotmargin.bottom, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.wvplotmargin.left, y + outermargin + this.plotmargin.bottom - this.wvplotmargin.top, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.wvplotmargin.left, y + outermargin + this.wvplotmargin.bottom, SCREENZ)
         );
         
     /*
@@ -96,15 +94,15 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     this.PLOTBG_VIRTUAL_WIDTH = plotter.VIRTUAL_WIDTH - 2 * outermargin;
     
-    this.innermarginOffsets = [new THREE.Vector3(this.innermargin.left, this.innermargin.bottom, 0),
-        new THREE.Vector3(-this.innermargin.right, this.innermargin.bottom, 0),
-        new THREE.Vector3(-this.innermargin.right, -this.innermargin.top, 0),
-        new THREE.Vector3(this.innermargin.left, -this.innermargin.top, 0)];
+    /*this.plotmarginOffsets = [new THREE.Vector3(this.plotmargin.left, this.plotmargin.bottom, 0),
+        new THREE.Vector3(-this.plotmargin.right, this.plotmargin.bottom, 0),
+        new THREE.Vector3(-this.plotmargin.right, -this.plotmargin.top, 0),
+        new THREE.Vector3(this.plotmargin.left, -this.plotmargin.top, 0)];*/
     
     // "draw" the plot space. It's transparent but it's needed to detect mouse clicks.
     this.plotspGeom = new THREE.Geometry();
     
-    this.plotspGeom.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
+    this.plotspGeom.vertices = this.plotbgGeom.vertices.slice(4, 8);
     this.resizeToMargins();
     this.plotspGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial();
@@ -505,21 +503,21 @@ Plot.prototype.drawGraph3 = function () {
     };
 
 Plot.prototype.resizeToMargins = function () {
-        this.innermarginOffsets[0].setX(this.innermargin.left);
-        this.innermarginOffsets[1].setX(-this.innermargin.right);
-        this.innermarginOffsets[2].setX(-this.innermargin.right);
-        this.innermarginOffsets[3].setX(this.innermargin.left);
+        /*this.plotmarginOffsets[0].setX(this.plotmargin.left);
+        this.plotmarginOffsets[1].setX(-this.plotmargin.right);
+        this.plotmarginOffsets[2].setX(-this.plotmargin.right);
+        this.plotmarginOffsets[3].setX(this.plotmargin.left);
         
-        this.innermarginOffsets[0].setY(this.innermargin.bottom);
-        this.innermarginOffsets[1].setY(this.innermargin.bottom);
-        this.innermarginOffsets[2].setY(-this.innermargin.top);
-        this.innermarginOffsets[3].setY(-this.innermargin.top);
+        this.plotmarginOffsets[0].setY(this.plotmargin.bottom);
+        this.plotmarginOffsets[1].setY(this.plotmargin.bottom);
+        this.plotmarginOffsets[2].setY(-this.plotmargin.top);
+        this.plotmarginOffsets[3].setY(-this.plotmargin.top);
         
         for (var i = 0; i < 4; i++) {
-            this.plotspGeom.vertices[i].addVectors(this.plotbgGeom.vertices[i], this.innermarginOffsets[i]);
-        }
+            this.plotspGeom.vertices[i].addVectors(this.plotbgGeom.vertices[i], this.plotmarginOffsets[i]);
+        }*/
         
-        this.plotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.innermargin.left - this.innermargin.right;
+        this.plotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.plotmargin.left - this.plotmargin.right;
         
         this.pixelsWideChanged();
         

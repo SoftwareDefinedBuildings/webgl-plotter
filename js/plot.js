@@ -14,6 +14,10 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.hToW = hToW;
     
     this.innermargin = {left: 20, right: 20, top: 20, bottom: 20};
+    this.ddplottopmargin = 2;
+    this.ddplotbottommargin = 2;
+    this.wvplottopmargin = 2;
+    this.wvplotbottommargin = 2;
     
     // draw the chart area
     this.plotbgGeom = new THREE.Geometry()
@@ -34,16 +38,16 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
             new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top, SCREENZ),
             
             // four ddplot corner vertices (8 - 11): tr, br, tl, bl
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - 2, SCREENZ),
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - 2, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.ddplottopmargin, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + this.ddplotbottommargin, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.ddplottopmargin, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top + this.ddplotbottommargin, SCREENZ),
             
             // four wrplot corner vertices (12 - 15): tr, br, tl, bl
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom - 2, SCREENZ),
-            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + 2, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom - 2, SCREENZ),
-            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + 2, SCREENZ)
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom - this.wvplottopmargin, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.wvplotbottommargin, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom - this.wvplottopmargin, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.wvplotbottommargin, SCREENZ)
         );
         
     /*
@@ -87,10 +91,6 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
             new THREE.Face3(11, 7, 6), new THREE.Face3(11, 6, 9)
         );
         
-    /*this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 5), new THREE.Face3(5, 4, 0),
-        new THREE.Face3(1, 2, 6), new THREE.Face3(6, 5, 1),
-        new THREE.Face3(2, 8, 6), new THREE.Face3(7, 10, 3), new THREE.Face3(8, 2, 3), new THREE.Face3(3, 10, 8), new THREE.Face3(6, 9, 11), new THREE.Face3(11, 7, 6),
-        new THREE.Face3(7, 3, 0), new THREE.Face3(0, 4, 7));*/
     var plotbg = new THREE.Mesh(this.plotbgGeom, new THREE.MeshBasicMaterial({color: 0xaaaaaa}));
     plotter.scene.add(plotbg);
     

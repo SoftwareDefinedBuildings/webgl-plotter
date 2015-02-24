@@ -20,24 +20,78 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     var w = plotter.VIRTUAL_WIDTH;
     var h = w * hToW;
     var SCREENZ = 0.01;
-    this.plotbgGeom.vertices.push(new THREE.Vector3(x + outermargin, y + outermargin, SCREENZ),
-        new THREE.Vector3(x + w - outermargin, y + outermargin, SCREENZ),
-        new THREE.Vector3(x + w - outermargin, y + h - outermargin, SCREENZ),
-        new THREE.Vector3(x + outermargin, y + h - outermargin, SCREENZ),
-        new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom, SCREENZ),
-        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom, SCREENZ),
-        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top, SCREENZ),
-        new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top, SCREENZ),
-        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - 2, SCREENZ),
-        new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
-        new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - 2, SCREENZ),
-        new THREE.Vector3(x + outermargin + this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ));
+    this.plotbgGeom.vertices.push(
+            // four outer corner vertices (0 - 3): bl, br, tr, tl
+            new THREE.Vector3(x + outermargin, y + outermargin, SCREENZ),
+            new THREE.Vector3(x + w - outermargin, y + outermargin, SCREENZ),
+            new THREE.Vector3(x + w - outermargin, y + h - outermargin, SCREENZ),
+            new THREE.Vector3(x + outermargin, y + h - outermargin, SCREENZ),
+            
+            // four plot corner vertices (4 - 7): bl, br, tr, tl
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top, SCREENZ),
+            
+            // four ddplot corner vertices (8 - 11): tr, br, tl, bl
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - 2, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - 2, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + h - outermargin - this.innermargin.top + 2, SCREENZ),
+            
+            // four wrplot corner vertices (12 - 15): tr, br, tl, bl
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + this.innermargin.bottom - 2, SCREENZ),
+            new THREE.Vector3(x + w - outermargin - this.innermargin.right, y + outermargin + 2, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + this.innermargin.bottom - 2, SCREENZ),
+            new THREE.Vector3(x + outermargin + this.innermargin.left, y + outermargin + 2, SCREENZ)
+        );
         
-    this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 5), new THREE.Face3(5, 4, 0),
+    /*
+        This is a map of how the vertices are placed
+    
+        3          2
+                    
+          10     8  
+          11     9  
+                    
+          7      6  
+                    
+          4      5  
+                    
+          14     12 
+          15     13 
+                    
+        0          1
+    */
+        
+    this.plotbgGeom.faces.push(
+            // bottom trapezoid
+            new THREE.Face3(0, 1, 15), new THREE.Face3(15, 1, 13),
+            
+            // top trapezoid
+            new THREE.Face3(2, 3, 10), new THREE.Face3(10, 8, 2),
+            
+            // wvplot left and right
+            new THREE.Face3(14, 0, 15), new THREE.Face3(12, 13, 1),
+            
+            // wvplot top / plot bottom
+            new THREE.Face3(4, 14, 12), new THREE.Face3(4, 12, 5),
+            
+            // plot right / ddplot right
+            new THREE.Face3(12, 1, 5), new THREE.Face3(5, 1, 2), new THREE.Face3(8, 5, 2),
+            
+            //plot left / ddplot left
+            new THREE.Face3(4, 0, 14), new THREE.Face3(3, 0, 4), new THREE.Face3(3, 4, 10),
+            
+            // ddplot bottom / plot top
+            new THREE.Face3(11, 7, 6), new THREE.Face3(11, 6, 9)
+        );
+        
+    /*this.plotbgGeom.faces.push(new THREE.Face3(0, 1, 5), new THREE.Face3(5, 4, 0),
         new THREE.Face3(1, 2, 6), new THREE.Face3(6, 5, 1),
         new THREE.Face3(2, 8, 6), new THREE.Face3(7, 10, 3), new THREE.Face3(8, 2, 3), new THREE.Face3(3, 10, 8), new THREE.Face3(6, 9, 11), new THREE.Face3(11, 7, 6),
-        new THREE.Face3(7, 3, 0), new THREE.Face3(0, 4, 7));
-    var plotbg = new THREE.Mesh(this.plotbgGeom, new THREE.MeshBasicMaterial({color: 0x00ff00}));
+        new THREE.Face3(7, 3, 0), new THREE.Face3(0, 4, 7));*/
+    var plotbg = new THREE.Mesh(this.plotbgGeom, new THREE.MeshBasicMaterial({color: 0xaaaaaa}));
     plotter.scene.add(plotbg);
     
     this.PLOTBG_VIRTUAL_WIDTH = plotter.VIRTUAL_WIDTH - 2 * outermargin;

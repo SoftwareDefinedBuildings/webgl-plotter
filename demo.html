@@ -28,7 +28,7 @@
                 var geom = new THREE.BoxGeometry(width, height, depth);
                 var material = new THREE.MeshBasicMaterial({color: 0xffffff});
                 this.obj = new THREE.Mesh(geom, material);
-                this.obj.wrapper = this; // an extra parameter I'm adding
+                this.obj.click = this.click.bind(this); // an extra parameter I'm adding
                 this.target = null;
                 this.selected = false;
             }

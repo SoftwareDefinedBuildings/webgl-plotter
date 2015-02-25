@@ -122,7 +122,10 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     plotter.scene.add(plotsp);
     
     // detect clicks in the plot space
-    plotsp.wrapper = this;
+    plotsp.startDrag = this.startDrag.bind(this);
+    plotsp.stopDrag = this.stopDrag.bind(this);
+    plotsp.drag = this.drag.bind(this);
+    plotsp.scroll = this.scroll.bind(this);
     plotter.draggables.push(plotsp);
     plotter.scrollables.push(plotsp);
     

@@ -37,7 +37,7 @@ function Plotter() {
             
             var obj;
             if (intersections.length > 0) {
-                intersections[0].object.wrapper.click();
+                intersections[0].object.click();
             }
         });
         
@@ -47,13 +47,13 @@ function Plotter() {
             var intersections = ray.intersectObjects(self.draggables);
             
             if (intersections.length > 0) {
-                intersections[0].object.wrapper.startDrag();
+                intersections[0].object.startDrag();
             }
         });
         
     $(document).mouseup(function () {
             for (var i = 0; i < self.draggables.length; i++) {
-                self.draggables[i].wrapper.stopDrag();
+                self.draggables[i].stopDrag();
             }
         });
         
@@ -67,7 +67,7 @@ function Plotter() {
                 dy = event.originalEvent.mozMovementY;
             }
             for (var i = 0; i < self.draggables.length; i++) {
-                self.draggables[i].wrapper.drag(dx, dy);
+                self.draggables[i].drag(dx, dy);
             }
         });
         
@@ -76,7 +76,7 @@ function Plotter() {
             var intersections = ray.intersectObjects(self.scrollables);
             
             if (intersections.length > 0) {
-                intersections[0].object.wrapper.scroll(event.wheelDelta);
+                intersections[0].object.scroll(event.wheelDelta);
                 return false;
             }
         };
@@ -86,7 +86,7 @@ function Plotter() {
             var intersections = ray.intersectObjects(self.scrollables);
             
             if (intersections.length > 0) {
-                intersections[0].object.wrapper.scroll(-120 * event.detail);
+                intersections[0].object.scroll(-120 * event.detail);
                 event.preventDefault();
             }
         }, false);

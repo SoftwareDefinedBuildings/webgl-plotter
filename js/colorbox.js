@@ -7,7 +7,7 @@ function ColorBox(width, height, centerX, centerY, centerZ) { // implements Clic
     geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial({color: 0x00ffff});
     this.obj = new THREE.Mesh(geom, material);
-    this.obj.wrapper = this; // an extra parameter I'm adding
+    this.obj.click = this.click.bind(this); // an extra parameter I'm adding
     this.target = null;
     this.selected = false;
 }

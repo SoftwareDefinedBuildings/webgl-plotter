@@ -159,7 +159,6 @@ Plot.prototype.setHeight = function (h) {
     this.plotbgGeom.verticesNeedUpdate = true;
 }
 
-/* The DDPlot's height and the WVPlot's height stays constant. And so does the gap between each and the plot. */
 Plot.prototype.resizePlot = function (x, y, w, h) {
         if (x != undefined) {
             this.plotmargin.left = x;

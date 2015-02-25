@@ -6,21 +6,31 @@
     
     The outer margin is fixed upon construction, though the inner margins
     change dynamically. The resizeToMargins method resizes the plot space
-    according to the inner margins. */
+    according to the inner margins.
+    
+    In many ways, the Plot is where the data and the graphics come together.
+    Unfortunately, that means that this class has to deal with both drawing
+    graphics and manipulating data, making it a bit cluttered. */
 
 function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scrollable
     this.plotter = plotter;
     this.outermargin = outermargin;
     this.hToW = hToW;
     
+    this.x = x;
+    this.y = y;
+    
     this.plotmargin = {left: 20, right: 20, top: 20, bottom: 20};
     this.ddplotmargin = {top: 2, bottom: 2}; // left and right are shared with plot margin, since these will always be aligned
-    this.wvplotmargin = {top: 2, bottom: 2, left: 20, right: 20}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
+    this.wvplotmargin = {top: 2, bottom: 2, left: 10, right: 10}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
     
     // draw the chart area
     this.plotbgGeom = new THREE.Geometry()
     var w = plotter.VIRTUAL_WIDTH;
     var h = w * hToW;
+    
+    this.w = plotter.VIRTUAL_WIDTH;
+    this.h = h;
     var SCREENZ = 0.01;
     this.plotbgGeom.vertices.push(
             // four outer corner vertices (0 - 3): bl, br, tr, tl
@@ -80,10 +90,10 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
             new THREE.Face3(4, 14, 12), new THREE.Face3(4, 12, 5),
             
             // plot right / ddplot right
-            new THREE.Face3(12, 1, 5), new THREE.Face3(5, 1, 2), new THREE.Face3(8, 5, 2),
+            new THREE.Face3(12, 1, 2), new THREE.Face3(5, 12, 2), new THREE.Face3(8, 5, 2),
             
             //plot left / ddplot left
-            new THREE.Face3(4, 0, 14), new THREE.Face3(3, 0, 4), new THREE.Face3(3, 4, 10),
+            new THREE.Face3(3, 0, 14), new THREE.Face3(3, 14, 4), new THREE.Face3(3, 4, 10),
             
             // ddplot bottom / plot top
             new THREE.Face3(11, 7, 6), new THREE.Face3(11, 6, 9)
@@ -137,6 +147,85 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     // reuse ShaderMaterials to gain performance
     this.shaders = {};
 }
+
+Plot.prototype.setHeight = function (h) {
+    h = h || this.h;
+    this.y = this.y + this.h - h;
+    this.h = h;
+    var newBottom = this.y + this.outermargin;
+    this.plotbgGeom.vertices[0].y = newBottom;
+    this.plotbgGeom.vertices[1].y = newBottom;
+    
+    this.plotbgGeom.verticesNeedUpdate = true;
+}
+
+/* The DDPlot's height and the WVPlot's height stays constant. And so does the gap between each and the plot. */
+Plot.prototype.resizePlot = function (x, y, w, h) {
+        if (x != undefined) {
+            this.plotmargin.left = x;
+            this.plotbgGeom.vertices[4].x = this.x + this.outermargin + this.plotmargin.left;
+            this.plotbgGeom.vertices[7].x = this.x + this.outermargin + this.plotmargin.left;
+            this.plotbgGeom.vertices[10].x = this.x + this.outermargin + this.plotmargin.left;
+            this.plotbgGeom.vertices[11].x = this.x + this.outermargin + this.plotmargin.left;
+        }
+        if (y != undefined) {
+            this.plotmargin.top = y;
+            this.plotbgGeom.vertices[6].y = this.y + this.h - this.outermargin - this.plotmargin.top;
+            this.plotbgGeom.vertices[7].y = this.y + this.h - this.outermargin - this.plotmargin.top;
+            this.plotbgGeom.vertices[9].y = this.y + this.h - this.outermargin - this.plotmargin.top + this.ddplotmargin.bottom;
+            this.plotbgGeom.vertices[11].y = this.y + this.h - this.outermargin - this.plotmargin.top + this.ddplotmargin.bottom;
+        }
+        if (w != undefined) {
+            this.plotmargin.right = this.w - w - this.plotmargin.left;
+            this.plotbgGeom.vertices[5].x = this.x + this.w - this.outermargin - this.plotmargin.right;
+            this.plotbgGeom.vertices[6].x = this.x + this.w - this.outermargin - this.plotmargin.right;
+            this.plotbgGeom.vertices[8].x = this.x + this.w - this.outermargin - this.plotmargin.right;
+            this.plotbgGeom.vertices[9].x = this.x + this.w - this.outermargin - this.plotmargin.right;
+        }
+        if (h != undefined) {
+            this.plotmargin.bottom = this.h - h - this.plotmargin.top;
+            this.plotbgGeom.vertices[4].y = this.y - this.outermargin + this.plotmargin.bottom;
+            this.plotbgGeom.vertices[5].y = this.y + this.outermargin + this.plotmargin.bottom;
+            this.plotbgGeom.vertices[12].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+            this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+        }
+        
+        this.plotbgGeom.verticesNeedUpdate = true;
+        this.plotspGeom.vertices.NeedUpdate = true;
+    };
+
+/* Y is the y coordinate of the top left corner. */
+Plot.prototype.resizeDDPlot = function (y, bottomGap) {
+        // To change x or w, just use resizePlot. The DDPlot and the main plot are linked in x coordinate and width.
+        // BottomGap is the space between the DDPlot and the main plot.
+        if (y != undefined) {
+            this.ddplotmargin.top = y;
+            this.plotbgGeom.vertices[8].y = this.y + this.h - this.outermargin - this.ddplotmargin.top;
+            this.plotbgGoem.vertices[10].y = this.y + this.h - this.outermargin - this.ddplotmargin.top;
+        }
+        if (bottomGap != undefined) {
+            this.ddplotmargin.bottom = bottomGap;
+            this.plotbgGeom.vertices[9].y = this.y + this.h - this.outermargin - this.plotmargin.top + this.ddplotmargin.bottom;
+            this.plotbgGeom.vertices[11].y = this.y + this.h - this.outermargin - this.plotmargin.top + this.ddplotmargin.bottom;
+        }
+        
+        this.plotbgGeom.verticesNeedUpdate = true;
+    };
+    
+/* Y is the y coordinate of the bottom left corner. */
+Plot.prototype.resizeWVPlot = function (y, topGap) {
+        if (y != undefined) {
+            this.wvplotmargin.bottom = y;
+            this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
+            this.plotbgGeom.vertices[15].y = this.y + this.outermargin + this.wvplotmargin.bottom;
+        }
+        if (topGap != undeifned) {
+            this.wvplotmargin.top = topGap;
+            this.plotbgGeom.vertices[12].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+            this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+        }
+        this.plotbgGeom.verticesNeedUpdate = true;
+    };
 
 /** Just draw the same data again with the new x-axis. In other words, we just
     read the first level of cache and draw that same data on the new axis. */

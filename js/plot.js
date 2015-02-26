@@ -421,6 +421,11 @@ Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endT
             
     };
     
+Plot.prototype.updateDefaultAxisRange = function () {
+        Axis.prototype.rangeLo = this.plotspGeom.vertices[0].y;
+        Axis.prototype.rangeHi = this.plotspGeom.vertices[3].y;
+    };
+    
 
 Plot.prototype.drawGraph1 = function () {
         // Normally we'd draw the x axis here. For now, I'm going to skip that.
@@ -473,8 +478,9 @@ Plot.prototype.drawGraph2 = function () {
                     }
                 }
             }
-            axis.setRange(this.plotspGeom.vertices[0].y, this.plotspGeom.vertices[3].y);
         }
+        
+        this.updateDefaultAxisRange();
         
         this.drawGraph3();
     };
@@ -689,6 +695,7 @@ Plot.prototype.resizePlot = function (deltaX, deltaY) {
         if (this.resizingPlot) {
             // technically, we should divide the virtual height and true height; I'm assuming that the image isn't stretched somehow
             this.setHeight(this.h + (deltaY  * this.plotspVirtualWidth / this.pixelsWide));
-            this.drawGraph2();
+            this.updateDefaultAxisRange();
+            this.drawGraph3();
         }
     };

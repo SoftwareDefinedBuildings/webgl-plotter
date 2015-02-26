@@ -1,9 +1,17 @@
 function Axis (domainLo, domainHi, rangeLo, rangeHi) {
     this.domainLo = domainLo;
     this.domainHi = domainHi;
-    this.rangeLo = rangeLo;
-    this.rangeHi = rangeHi;
+    
+    if (rangeLo != undefined) {
+        this.rangeLo = rangeLo;
+    }
+    if (rangeHi != undefined) {
+        this.rangeHi = rangeHi;
+    }
 }
+
+Axis.prototype.rangeLo = 0;
+Axis.prototype.rangeHi = 1;
 
 Axis.prototype.map = function (x) {
         return this.rangeLo + ((x - this.domainLo) / (this.domainHi - this.domainLo)) * (this.rangeHi - this.rangeLo);

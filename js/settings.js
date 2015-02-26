@@ -17,7 +17,7 @@ StreamSettings.prototype.deselect = function () {
     };
     
 function StreamAxis(id, domainLo, domainHi, rangeLo, rangeHi) {
-    Axis.call(this, domainLo || -1, domainHi || 1, rangeLo || 0, rangeHi || 1);
+    Axis.call(this, domainLo || -1, domainHi || 1, rangeLo, rangeHi);
     this.axisname = id;
     this.axisid = id;
     this.streams = new LinkedList(); // a linked list of streams

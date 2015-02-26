@@ -689,5 +689,6 @@ Plot.prototype.resizePlot = function (deltaX, deltaY) {
         if (this.resizingPlot) {
             // technically, we should divide the virtual height and true height; I'm assuming that the image isn't stretched somehow
             this.setHeight(this.h + (deltaY  * this.plotspVirtualWidth / this.pixelsWide));
+            this.drawGraph2();
         }
     };

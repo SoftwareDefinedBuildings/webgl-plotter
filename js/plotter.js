@@ -51,12 +51,16 @@ function Plotter() {
             }
         });
         
-    $(document).mouseup(function () {
-            for (var i = 0; i < self.draggables.length; i++) {
-                self.draggables[i].stopDrag();
+    $(document).mouseup(function (event) {
+            var ray = self.getMouseRay(event);
+            var intersections = ray.intersectObjects(self.draggables);
+            
+            for (var i = 0; i < intersections.length; i++) {
+                intersections[i].object.stopDrag();
             }
         });
         
+    // Drags everything. That's why we have a startDrag and stopDrag; each object keeps track of its own state and takes action accordingly.
     $(this.canvas).mousemove(function (event) {
             var dx, dy;
             if (event.originalEvent.hasOwnProperty("movementX")) {
@@ -66,6 +70,7 @@ function Plotter() {
                 dx = event.originalEvent.mozMovementX;
                 dy = event.originalEvent.mozMovementY;
             }
+            
             for (var i = 0; i < self.draggables.length; i++) {
                 self.draggables[i].drag(dx, dy);
             }

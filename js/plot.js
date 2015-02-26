@@ -5,8 +5,7 @@
     X and Y specify the coordinates of the bottom left corner of the plotter.
     
     The outer margin is fixed upon construction, though the inner margins
-    change dynamically. The resizeToMargins method resizes the plot space
-    according to the inner margins.
+    change dynamically.
     
     In many ways, the Plot is where the data and the graphics come together.
     Unfortunately, that means that this class has to deal with both drawing
@@ -104,30 +103,44 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     this.PLOTBG_VIRTUAL_WIDTH = plotter.VIRTUAL_WIDTH - 2 * outermargin;
     
+    this.updateWidth();
+    
     /*this.plotmarginOffsets = [new THREE.Vector3(this.plotmargin.left, this.plotmargin.bottom, 0),
         new THREE.Vector3(-this.plotmargin.right, this.plotmargin.bottom, 0),
         new THREE.Vector3(-this.plotmargin.right, -this.plotmargin.top, 0),
         new THREE.Vector3(this.plotmargin.left, -this.plotmargin.top, 0)];*/
     
-    // "draw" the plot space. It's transparent but it's needed to detect mouse clicks.
+    var material;
+    // Detect clicks in the plot space. It's transparent but it's needed to detect mouse clicks.
     this.plotspGeom = new THREE.Geometry();
-    
     this.plotspGeom.vertices = this.plotbgGeom.vertices.slice(4, 8);
-    this.resizeToMargins();
     this.plotspGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
-    var material = new THREE.MeshBasicMaterial();
+    material = new THREE.MeshBasicMaterial();
     material.transparent = true;
     material.opacity = 0;
     var plotsp = new THREE.Mesh(this.plotspGeom, material);
     plotter.scene.add(plotsp);
-    
-    // detect clicks in the plot space
-    plotsp.startDrag = this.startDrag.bind(this);
-    plotsp.stopDrag = this.stopDrag.bind(this);
-    plotsp.drag = this.drag.bind(this);
-    plotsp.scroll = this.scroll.bind(this);
+    plotsp.startDrag = this.startDragPlot.bind(this);
+    plotsp.stopDrag = this.stopDragPlot.bind(this);
+    plotsp.drag = this.dragPlot.bind(this);
+    plotsp.scroll = this.scrollPlot.bind(this);
     plotter.draggables.push(plotsp);
     plotter.scrollables.push(plotsp);
+    
+    // Detect clicks in the plot drag area. It's transparent but it's needed to detect mouse clicks.
+    this.plotdrGeom = new THREE.Geometry();
+    this.plotdrGeom.vertices.push(this.plotbgGeom.vertices[4], this.plotbgGeom.vertices[5], this.plotbgGeom.vertices[12], this.plotbgGeom.vertices[14]);
+    this.plotdrGeom.faces.push(new THREE.Face3(0, 3, 1), new THREE.Face3(1, 3, 2));
+    material = new THREE.MeshBasicMaterial();
+    material.transparent = true;
+    material.opacity = 0;
+    var plotdr = new THREE.Mesh(this.plotdrGeom, material);
+    plotter.scene.add(plotdr);
+    //plotdr.startDrag = this.startDragPlot.bind(this);
+    //plotdr.stopDrag = this.stopDragPlot.bind(this);
+    //plotdr.drag = this.dragPlot.bind(this);
+    //plotdr.scroll = this.scrollPlot.bind(this);
+    //plotter.draggables.push(plotdr);
     
     // create the first level of cache
     this.drawingCache = {};
@@ -183,6 +196,7 @@ Plot.prototype.resizePlot = function (x, y, w, h) {
             this.plotbgGeom.vertices[6].x = this.x + this.w - this.outermargin - this.plotmargin.right;
             this.plotbgGeom.vertices[8].x = this.x + this.w - this.outermargin - this.plotmargin.right;
             this.plotbgGeom.vertices[9].x = this.x + this.w - this.outermargin - this.plotmargin.right;
+            this.updateWidth();
         }
         if (h != undefined) {
             this.plotmargin.bottom = this.h - h - this.plotmargin.top;
@@ -193,7 +207,7 @@ Plot.prototype.resizePlot = function (x, y, w, h) {
         }
         
         this.plotbgGeom.verticesNeedUpdate = true;
-        this.plotspGeom.vertices.NeedUpdate = true;
+        this.plotspGeom.verticesNeedUpdate = true;
     };
 
 /* Y is the y coordinate of the top left corner. */
@@ -593,26 +607,9 @@ Plot.prototype.drawGraph3 = function () {
         }
     };
 
-Plot.prototype.resizeToMargins = function () {
-        /*this.plotmarginOffsets[0].setX(this.plotmargin.left);
-        this.plotmarginOffsets[1].setX(-this.plotmargin.right);
-        this.plotmarginOffsets[2].setX(-this.plotmargin.right);
-        this.plotmarginOffsets[3].setX(this.plotmargin.left);
-        
-        this.plotmarginOffsets[0].setY(this.plotmargin.bottom);
-        this.plotmarginOffsets[1].setY(this.plotmargin.bottom);
-        this.plotmarginOffsets[2].setY(-this.plotmargin.top);
-        this.plotmarginOffsets[3].setY(-this.plotmargin.top);
-        
-        for (var i = 0; i < 4; i++) {
-            this.plotspGeom.vertices[i].addVectors(this.plotbgGeom.vertices[i], this.plotmarginOffsets[i]);
-        }*/
-        
+Plot.prototype.updateWidth = function () {        
         this.plotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.plotmargin.left - this.plotmargin.right;
-        
         this.pixelsWideChanged();
-        
-        this.plotspGeom.verticesNeedUpdate = true;
     };
     
 Plot.prototype.pixelsWideChanged = function () {
@@ -627,7 +624,7 @@ Plot.prototype.recomputePixelsWideIfNecessary = function () {
         }
     };
     
-Plot.prototype.startDrag = function () {
+Plot.prototype.startDragPlot = function () {
         this.scrolling = true;
         var self = this;
         this.fullUpdate(function () {
@@ -635,7 +632,7 @@ Plot.prototype.startDrag = function () {
             }, true);
     };
     
-Plot.prototype.stopDrag = function () {
+Plot.prototype.stopDragPlot = function () {
         this.scrolling = false;
         var self = this;
         this.fullUpdate(function () {
@@ -643,7 +640,7 @@ Plot.prototype.stopDrag = function () {
             }, true);
     };
     
-Plot.prototype.drag = function (deltaX, deltaY) {
+Plot.prototype.dragPlot = function (deltaX, deltaY) {
         if (this.scrolling) {
             // Update the axis
             var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
@@ -659,7 +656,7 @@ Plot.prototype.drag = function (deltaX, deltaY) {
         }
     };
     
-Plot.prototype.scroll = function (amount) {
+Plot.prototype.scrollPlot = function (amount) {
         amount = Math.min(amount, 100);
         var currRange = subTimes(this.xAxis.domainHi.slice(0, 2), this.xAxis.domainLo);
         mulTime(currRange, amount / 1000);

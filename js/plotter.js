@@ -51,12 +51,9 @@ function Plotter() {
             }
         });
         
-    $(document).mouseup(function (event) {
-            var ray = self.getMouseRay(event);
-            var intersections = ray.intersectObjects(self.draggables);
-            
-            for (var i = 0; i < intersections.length; i++) {
-                intersections[i].object.stopDrag();
+    $(document).mouseup(function () {
+            for (var i = 0; i < self.draggables.length; i++) {
+                self.draggables[i].stopDrag();
             }
         });
         
@@ -104,7 +101,7 @@ function Plotter() {
     
     // draw white background behind the plot
     var bgGeom = new THREE.Geometry();
-    bgGeom.vertices.push(new THREE.Vector3(-200, 0, -100), new THREE.Vector3(200, 0, -100), new THREE.Vector3(200, 200, -100), new THREE.Vector3(-200, 200, -100));
+    bgGeom.vertices.push(new THREE.Vector3(-200, -200, -100), new THREE.Vector3(200, -200, -100), new THREE.Vector3(200, 200, -100), new THREE.Vector3(-200, 200, -100));
     bgGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     this.scene.add(new THREE.Mesh(bgGeom, new THREE.MeshBasicMaterial({color: 0xffffff})));
         

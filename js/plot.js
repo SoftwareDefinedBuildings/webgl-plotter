@@ -136,11 +136,10 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     material.opacity = 0;
     var plotdr = new THREE.Mesh(this.plotdrGeom, material);
     plotter.scene.add(plotdr);
-    //plotdr.startDrag = this.startDragPlot.bind(this);
-    //plotdr.stopDrag = this.stopDragPlot.bind(this);
-    //plotdr.drag = this.dragPlot.bind(this);
-    //plotdr.scroll = this.scrollPlot.bind(this);
-    //plotter.draggables.push(plotdr);
+    plotdr.startDrag = this.startResizePlot.bind(this);
+    plotdr.stopDrag = this.stopResizePlot.bind(this);
+    plotdr.drag = this.resizePlot.bind(this);
+    plotter.draggables.push(plotdr);
     
     // create the first level of cache
     this.drawingCache = {};
@@ -172,10 +171,18 @@ Plot.prototype.setHeight = function (h) {
     this.plotbgGeom.vertices[0].y = newBottom;
     this.plotbgGeom.vertices[1].y = newBottom;
     
+    this.plotbgGeom.vertices[4].y = this.y - this.outermargin + this.plotmargin.bottom;
+    this.plotbgGeom.vertices[5].y = this.y + this.outermargin + this.plotmargin.bottom;
+    this.plotbgGeom.vertices[12].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+    this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+    
+    this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
+    this.plotbgGeom.vertices[15].y = this.y + this.outermargin + this.wvplotmargin.bottom;
+    
     this.plotbgGeom.verticesNeedUpdate = true;
 }
 
-Plot.prototype.resizePlot = function (x, y, w, h) {
+Plot.prototype.setPlot = function (x, y, w, h) {
         if (x != undefined) {
             this.plotmargin.left = x;
             this.plotbgGeom.vertices[4].x = this.x + this.outermargin + this.plotmargin.left;
@@ -211,7 +218,7 @@ Plot.prototype.resizePlot = function (x, y, w, h) {
     };
 
 /* Y is the y coordinate of the top left corner. */
-Plot.prototype.resizeDDPlot = function (y, bottomGap) {
+Plot.prototype.setDDPlot = function (y, bottomGap) {
         // To change x or w, just use resizePlot. The DDPlot and the main plot are linked in x coordinate and width.
         // BottomGap is the space between the DDPlot and the main plot.
         if (y != undefined) {
@@ -229,7 +236,7 @@ Plot.prototype.resizeDDPlot = function (y, bottomGap) {
     };
     
 /* Y is the y coordinate of the bottom left corner. */
-Plot.prototype.resizeWVPlot = function (y, topGap) {
+Plot.prototype.setWVPlot = function (y, topGap) {
         if (y != undefined) {
             this.wvplotmargin.bottom = y;
             this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
@@ -668,4 +675,19 @@ Plot.prototype.scrollPlot = function (amount) {
         this.fullUpdate(function () {
                 self.drawGraph3();
             }, true);
+    };
+    
+Plot.prototype.startResizePlot = function () {
+        this.resizingPlot = true;
+    };
+    
+Plot.prototype.stopResizePlot = function () {
+        this.resizingPlot = false;
+    };
+    
+Plot.prototype.resizePlot = function (deltaX, deltaY) {
+        if (this.resizingPlot) {
+            // technically, we should divide the virtual height and true height; I'm assuming that the image isn't stretched somehow
+            this.setHeight(this.h + (deltaY  * this.plotspVirtualWidth / this.pixelsWide));
+        }
     };

@@ -141,8 +141,13 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     plotdr.drag = this.resizePlot.bind(this);
     plotter.draggables.push(plotdr);
     
-    // create the first level of cache
+    // create the first level of cache for the main plot
     this.drawingCache = {};
+    this.shaders = {};
+    
+    // create the first level of cache for the summary plot
+    this.summaryCache = {};
+    this.summaryShaders = {};
     
     // create the second level of cache
     this.dataCache = new Cache(plotter.requester);
@@ -158,9 +163,6 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // used to keep track of caching data
     this.drawRequestID = 0;
-    
-    // reuse ShaderMaterials to gain performance
-    this.shaders = {};
 }
 
 Plot.prototype.setHeight = function (h) {
@@ -261,14 +263,29 @@ Plot.prototype.quickUpdate = function () {
     may have changed. In other words, we search in the second level of cache
     and draw the correct data. The method is not guaranteed to call CALLBACK
     synchronously, though it might. */
-Plot.prototype.fullUpdate = function (callback, tempUpdate) {
+Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
+        var cache, cachedShaders;
+        if (summary) {
+            cache = this.summaryCache;
+            cachedShaders = this.summaryShaders;
+        } else {
+            cache = this.drawingCache;
+            cachedShaders = this.shaders;
+        }
+        
         // Compute the new point width exponent
         var nanoDiff = this.endTime.slice(0);
         subTimes(nanoDiff, this.startTime);
         
-        this.recomputePixelsWideIfNecessary();
+        var pwe;
         
-        this.pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWide));
+        if (summary) {
+            this.recomputePixelsWideSummaryIfNecessary();
+            pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWideSummary));
+        } else {
+            this.recomputePixelsWideIfNecessary();
+            pwe = getPWExponent(mulTime(nanoDiff, 1 / this.pixelsWide));
+        }
         
         var streams = this.plotter.settings.getStreams();
         
@@ -284,14 +301,12 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
         var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
         
         if (thisRequestID % 10 == 0) {
-            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), this.pwe, 500000, 250000);
+            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 500000, 250000);
         }
-        
-        var pwe = this.pwe
         
         for (var streamnode = streams.head; streamnode != null; streamnode = streamnode.next) {
             currUUID = streamnode.elem.uuid;
-            this.dataCache.getData(currUUID, this.pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
+            this.dataCache.getData(currUUID, pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
                             if (thisRequestID != self.drawRequestID) {
                                 return; // another request has been made, so stop
@@ -299,7 +314,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                             
                             // start caching data in advance
                             setTimeout(function () {
-                                    self.cacheDataInAdvance(uuid, thisRequestID, self.pwe, loRequestTime, hiRequestTime);
+                                    self.cacheDataInAdvance(uuid, thisRequestID, pwe, loRequestTime, hiRequestTime);
                                 }, 1000);
                             
                             newDrawingCache[uuid] = entry;
@@ -307,28 +322,28 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                             if (numreplies == numstreams) {
                                 var cacheUuid, cacheEntry, shaders;
                                 // Cleanup work for cache entries that are being removed
-                                for (cacheUuid in self.drawingCache) {
-                                    if (self.drawingCache.hasOwnProperty(cacheUuid)) {
-                                        if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
+                                for (cacheUuid in cache) {
+                                    if (cache.hasOwnProperty(cacheUuid)) {
+                                        if (newDrawingCache[cacheUuid] === cache[cacheUuid]) {
                                             continue;
                                         }
-                                        cacheEntry = self.drawingCache[cacheUuid];
+                                        cacheEntry = cache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
                                         cacheEntry.disposeIfPossible();
                                         if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
                                             continue;
                                         }
-                                        shaders = self.shaders[cacheUuid];
+                                        shaders = cachedShaders[cacheUuid];
                                         shaders[0].dispose();
                                         shaders[1].dispose();
                                         shaders[2].dispose();
-                                        delete self.shaders[cacheUuid];
+                                        delete cachedShaders[cacheUuid];
                                     }
                                 }
                                 // Setup work for cache entries that are being added
                                 for (cacheUuid in newDrawingCache) {
                                     if (newDrawingCache.hasOwnProperty(cacheUuid)) {
-                                        if (newDrawingCache[cacheUuid] === self.drawingCache[cacheUuid]) {
+                                        if (newDrawingCache[cacheUuid] === cache[cacheUuid]) {
                                             continue;
                                         }
                                         var ce = newDrawingCache[cacheUuid];
@@ -337,11 +352,11 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                             ce.cacheDrawing(pwe);
                                         }
                                         
-                                        if (self.drawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry
-                                            shaders = self.shaders[cacheUuid];
+                                        if (cache.hasOwnProperty(cacheUuid)) { // the stream isn't being added, just a new cache entry
+                                            shaders = cachedShaders[cacheUuid];
                                         } else {
                                             shaders = Cache.makeShaders();
-                                            self.shaders[cacheUuid] = shaders;
+                                            cachedShaders[cacheUuid] = shaders;
                                         }
                                         var shader = shaders[0];
                                         var rangeshader = shaders[1];
@@ -360,7 +375,13 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                     }
                                 }
                                 fp = null;
-                                self.drawingCache = newDrawingCache; // replace the first layer of the cache
+                                
+                                // replace the first layer of the cache
+                                if (summary) {
+                                    self.summaryCache = newDrawingCache;
+                                } else {
+                                    self.drawingCache = newDrawingCache;
+                                }
                                 callback();
                             }
                         };
@@ -627,11 +648,23 @@ Plot.prototype.pixelsWideChanged = function () {
         this.pixelsWide = NaN;
     };
     
+Plot.prototype.pixelsWideSummaryChanged = function () {
+        this.pixelsWideSummary = NaN;
+    };
+    
 Plot.prototype.recomputePixelsWideIfNecessary = function () {
         if (isNaN(this.pixelsWide)) {
             var leftVect = this.plotspGeom.vertices[0].clone().project(this.plotter.camera);
             var rightVect = this.plotspGeom.vertices[1].clone().project(this.plotter.camera);
             this.pixelsWide = rightVect.sub(leftVect).length() * this.plotter.width / 2;
+        }
+    };
+    
+Plot.prototype.recomputePixelsWideSummaryIfNecessary = function () {
+        if (isNaN(this.pixelsWideSummary)) {
+            var leftVect = this.plotbgGeom.vertices[15].clone().project(this.plotter.camera);
+            var rightVect = this.plotbgGeom.vertices[13].clone().project(this.plotter.camera);
+            this.pixelsWideSummary = rightVect.sub(leftVect).length() * this.plotter.width / 2;
         }
     };
     

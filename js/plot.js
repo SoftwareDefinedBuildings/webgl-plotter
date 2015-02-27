@@ -324,6 +324,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         shaders = self.shaders[cacheUuid];
                                         shaders[0].dispose();
                                         shaders[1].dispose();
+                                        shaders[2].dispose();
                                         delete self.shaders[cacheUuid];
                                     }
                                 }

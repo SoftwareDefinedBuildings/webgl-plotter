@@ -41,6 +41,7 @@ function CacheEntry(startTime, endTime, data) {
     this.cached_data = data;
     this.cached_drawing = {};
     this.inPrimaryCache = false;
+    this.inSummaryCache = false;
     this.inSecondaryCache = true;
 }
 
@@ -83,11 +84,18 @@ CacheEntry.prototype.freeDrawing = function () {
         this.cached_drawing = {};
     };
     
+CacheEntry.prototype.disposeIfPossible = function () {
+        if (!this.inSecondaryCache && !this.inPrimaryCache && !this.inSummaryCache) {
+            if (this.cached_drawing.hasOwnProperty("graph")) {
+                this.compressIfPossible(); // help speed up garbage collection
+                this.freeDrawing();
+            }
+        }
+    };
+    
 CacheEntry.prototype.removeFromSecCache = function () {
         this.inSecondaryCache = false;
-        if (this.cached_drawing.hasOwnProperty("graph") && !this.inPrimaryCache) {
-            this.freeDrawing();
-        }
+        this.disposeIfPossible();
     };
 
 /* Ensures that CACHE, an array of cache entries, is not corrupted. Included

@@ -314,10 +314,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate) {
                                         }
                                         cacheEntry = self.drawingCache[cacheUuid];
                                         cacheEntry.inPrimaryCache = false;
-                                        if ((!cacheEntry.inSecondaryCache) && cacheEntry.cached_drawing.hasOwnProperty("graph")) {
-                                            cacheEntry.compressIfPossible();
-                                            cacheEntry.freeDrawing();
-                                        }
+                                        cacheEntry.disposeIfPossible();
                                         if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
                                             continue;
                                         }

@@ -302,8 +302,8 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
         var loRequestTime = roundTime(axis.domainLo.slice(0, 2));
         var hiRequestTime = roundTime(axis.domainHi.slice(0, 2));
         
-        if (thisRequestID % 10 == 0) {
-            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 500000, 250000);
+        if (thisRequestID % 5 == 0) {
+            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 100000, 50000);
         }
         
         for (var streamnode = streams.head; streamnode != null; streamnode = streamnode.next) {
@@ -560,7 +560,7 @@ Plot.prototype.drawGraph3 = function () {
             this.plotter.scene.add(this.plot);
         }
         var cacheEntry;
-        var shaders, shader;
+        var shaders;
         
         var dispSettings;
         
@@ -603,16 +603,7 @@ Plot.prototype.drawGraph3 = function () {
                     
                     if (cacheEntry.getLength() != 0) {
                         graph = cacheEntry.cached_drawing.rangegraph;
-                        shader = shaders[1];
-                        shader.uniforms.affineMatrix.value = affineMatrix;
-                        shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                        shader.uniforms.color.value = dispSettings.color;
-                        shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
-                        shader.uniforms.yDomainLo.value = axis.domainLo;
-                        shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                        shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                        shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                        shader.uniforms.horizPixelShift.value = pixelShift;
+                        packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
                         
                         if (meshNum < this.plot.children.length) {
                             mesh = this.plot.children[meshNum];
@@ -625,19 +616,10 @@ Plot.prototype.drawGraph3 = function () {
                         meshNum++;
                         
                         mesh.geometry = graph;
-                        mesh.material = shader;
+                        mesh.material = shaders[1];
                         
                         graph = cacheEntry.cached_drawing.graph;
-                        shader = shaders[0];
-                        shader.uniforms.affineMatrix.value = affineMatrix;
-                        shader.uniforms.color.value = dispSettings.color;
-                        shader.uniforms.rot90Matrix.value = this.rotator90;
-                        shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                        shader.uniforms.yDomainLo.value = axis.domainLo;
-                        shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                        shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                        shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
-                        shader.uniforms.horizPixelShift.value = pixelShift;
+                        packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, undefined, this.rotator90);
                         
                         if (meshNum < this.plot.children.length) {
                             mesh = this.plot.children[meshNum];
@@ -650,18 +632,11 @@ Plot.prototype.drawGraph3 = function () {
                         meshNum++;
                         
                         mesh.geometry = graph;
-                        mesh.material = shader;
+                        mesh.material = shaders[0];
                     }
                     
                     graph = cacheEntry.cached_drawing.ddplot;
-                    shader = shaders[2];
-                    shader.uniforms.affineMatrix.value = ddMatrix;
-                    shader.uniforms.color.value = dispSettings.color;
-                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 2 : THICKNESS;
-                    shader.uniforms.yDomainLo.value = ddAxis.domainLo;
-                    shader.uniforms.xDomainLo1000.value = Math.floor(this.xAxis.domainLo[0] / 1000000);
-                    shader.uniforms.xDomainLoMillis.value = this.xAxis.domainLo[0] % 1000000;
-                    shader.uniforms.xDomainLoNanos.value = this.xAxis.domainLo[1];
+                    packShaderUniforms(shaders[2], ddMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 2 : THICKNESS, this.xAxis, ddAxis);
                     
                     if (meshNum < this.plot.children.length) {
                         mesh = this.plot.children[meshNum];
@@ -674,7 +649,7 @@ Plot.prototype.drawGraph3 = function () {
                     meshNum++;
                     
                     mesh.geometry = graph;
-                    mesh.material = shader;
+                    mesh.material = shaders[2];
                 }
             }
         }
@@ -724,16 +699,7 @@ Plot.prototype.drawSummary3 = function () {
                 
                 if (cacheEntry.getLength() != 0) {
                     graph = cacheEntry.cached_drawing.rangegraph;
-                    shader = shaders[1];
-                    shader.uniforms.affineMatrix.value = affineMatrix;
-                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                    shader.uniforms.color.value = dispSettings.color;
-                    shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
-                    shader.uniforms.yDomainLo.value = axis.domainLo;
-                    shader.uniforms.xDomainLo1000.value = Math.floor(this.summaryXAxis.domainLo[0] / 1000000);
-                    shader.uniforms.xDomainLoMillis.value = this.summaryXAxis.domainLo[0] % 1000000;
-                    shader.uniforms.xDomainLoNanos.value = this.summaryXAxis.domainLo[1];
-                    shader.uniforms.horizPixelShift.value = pixelShift;
+                    packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, axis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
                     
                     if (meshNum < this.wvplot.children.length) {
                         mesh = this.wvplot.children[meshNum];
@@ -746,19 +712,10 @@ Plot.prototype.drawSummary3 = function () {
                     meshNum++;
                     
                     mesh.geometry = graph;
-                    mesh.material = shader;
+                    mesh.material = shaders[1];
                     
                     graph = cacheEntry.cached_drawing.graph;
-                    shader = shaders[0];
-                    shader.uniforms.affineMatrix.value = affineMatrix;
-                    shader.uniforms.color.value = dispSettings.color;
-                    shader.uniforms.rot90Matrix.value = this.rotator90;
-                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
-                    shader.uniforms.yDomainLo.value = axis.domainLo;
-                    shader.uniforms.xDomainLo1000.value = Math.floor(this.summaryXAxis.domainLo[0] / 1000000);
-                    shader.uniforms.xDomainLoMillis.value = this.summaryXAxis.domainLo[0] % 1000000;
-                    shader.uniforms.xDomainLoNanos.value = this.summaryXAxis.domainLo[1];
-                    shader.uniforms.horizPixelShift.value = pixelShift;
+                    packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, axis, pixelShift, undefined, this.rotator90)
                     
                     if (meshNum < this.wvplot.children.length) {
                         mesh = this.wvplot.children[meshNum];
@@ -771,7 +728,7 @@ Plot.prototype.drawSummary3 = function () {
                     meshNum++;
                     
                     mesh.geometry = graph;
-                    mesh.material = shader;
+                    mesh.material = shaders[0];
                 }
             }
         }

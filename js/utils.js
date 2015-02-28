@@ -147,3 +147,22 @@ function getPWExponent(nanos) {
 }
 
 var pws = [[0, 0.5], [0, 1], [0, 2], [0, 4], [0, 8], [0, 16], [0, 32], [0, 64], [0, 128], [0, 256], [0, 512], [0, 1024], [0, 2048], [0, 4096], [0, 8192], [0, 16384], [0, 32768], [0, 65536], [0, 131072], [0, 262144], [0, 524288], [1, 48576], [2, 97152], [4, 194304], [8, 388608], [16, 777216], [33, 554432], [67, 108864], [134, 217728], [268, 435456], [536, 870912], [1073, 741824], [2147, 483648], [4294, 967296], [8589, 934592], [17179, 869184], [34359, 738368], [68719, 476736], [137438, 953472], [274877, 906944], [549755, 813888], [1099511, 627776], [2199023, 255552], [4398046, 511104], [8796093, 22208], [17592186, 44416], [35184372, 88832], [70368744, 177664], [140737488, 355328], [281474976, 710656], [562949953, 421312], [1125899906, 842624], [2251799813, 685248], [4503599627, 370496], [9007199254, 740992], [18014398509, 481984], [36028797018, 963968], [72057594037, 927936], [144115188075, 855872], [288230376151, 711744], [576460752303, 423488], [1152921504606, 846976], [2305843009213, 693952], [4611686018427, 387904]];
+
+function packShaderUniforms(shader, affineMatrix, color, thickness, xAxis, yAxis, pixelShift, alpha, rotator90) {
+    shader.uniforms.affineMatrix.value = affineMatrix;
+    shader.uniforms.color.value = color;
+    shader.uniforms.thickness.value = thickness;
+    shader.uniforms.yDomainLo.value = yAxis.domainLo;
+    shader.uniforms.xDomainLo1000.value = Math.floor(xAxis.domainLo[0] / 1000000);
+    shader.uniforms.xDomainLoMillis.value = xAxis.domainLo[0] % 1000000;
+    shader.uniforms.xDomainLoNanos.value = xAxis.domainLo[1];
+    if (pixelShift != undefined) {
+        shader.uniforms.horizPixelShift.value = pixelShift;
+    }
+    if (rotator90 != undefined) {
+        shader.uniforms.rot90Matrix.value = rotator90;
+    }
+    if (alpha != undefined) {
+        shader.uniforms.alpha.value = alpha;
+    }
+}

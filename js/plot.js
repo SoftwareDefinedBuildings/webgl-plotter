@@ -135,7 +135,6 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     wvplotsp.stopDrag = this.stopDragWVPlot.bind(this);
     wvplotsp.drag = this.dragWVPlot.bind(this);
     plotter.draggables.push(wvplotsp);
-    plotter.scrollables.push(wvplotsp);
     
     // Detect clicks in the plot drag area. It's transparent but it's needed to detect mouse clicks.
     this.plotdrGeom = new THREE.Geometry();
@@ -277,7 +276,7 @@ Plot.prototype.quickUpdateSummary = function () {
     may have changed. In other words, we search in the second level of cache
     and draw the correct data. The method is not guaranteed to call CALLBACK
     synchronously, though it might. */
-Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
+Plot.prototype.fullUpdate = function (callback, summary) {
         var cache, cachedShaders, axis;
         if (summary) {
             cache = this.summaryCache;
@@ -410,9 +409,6 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
                         };
                 })(currUUID), false);
         }
-        if (tempUpdate) {
-            this.drawGraph3();
-        }
     };
     
 Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endTime) {
@@ -477,7 +473,7 @@ Plot.prototype.drawGraph1 = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph2();
-            }, false, false);
+            }, false);
     };
     
 Plot.prototype.drawSummary1 = function () {
@@ -489,7 +485,7 @@ Plot.prototype.drawSummary1 = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawSummary2();
-            }, false, true);
+            }, true);
     };
     
 Plot.prototype.drawGraph2 = function () {
@@ -726,18 +722,20 @@ Plot.prototype.recomputePixelsWideSummaryIfNecessary = function () {
     
 Plot.prototype.startDragPlot = function () {
         this.scrolling = true;
+        this.drawGraph3();
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
-            }, true, false);
+            }, false);
     };
     
 Plot.prototype.stopDragPlot = function () {
         this.scrolling = false;
+        this.drawGraph3();
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
-            }, true, false);
+            }, false);
     };
     
 Plot.prototype.dragPlot = function (deltaX, deltaY) {
@@ -761,11 +759,12 @@ Plot.prototype.scrollPlot = function (amount) {
         addTimes(this.xAxis.domainLo, currRange);
         subTimes(this.xAxis.domainHi, currRange);
         
+        this.drawGraph3();
         var self = this;
         // Update the screen
         this.fullUpdate(function () {
                 self.drawGraph3();
-            }, true, false);
+            }, false);
     };
     
 Plot.prototype.startResizePlot = function () {
@@ -789,18 +788,20 @@ Plot.prototype.resizePlot = function (deltaX, deltaY) {
     
 Plot.prototype.startDragWVPlot = function () {
         this.scrollingWV = true;
+        this.drawSummary3();
         var self = this;
         this.fullUpdate(function () {
                 self.drawSummary3();
-            }, true, true);
+            }, true);
     };
     
 Plot.prototype.stopDragWVPlot = function () {
         this.scrollingWV = false;
+        this.drawSummary3();
         var self = this;
         this.fullUpdate(function () {
                 self.drawSummary3();
-            }, true, true);
+            }, true);
     };
     
 Plot.prototype.dragWVPlot = function (deltaX, deltaY) {

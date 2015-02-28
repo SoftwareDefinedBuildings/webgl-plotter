@@ -44,6 +44,11 @@ function Plotter() {
     // Support for the draggable interface
     self.dragging = null; // the object that we're currently dragging
     $(this.canvas).mousedown(function (event) {
+            if (self.dragging !== null) {
+                self.dragging.stopDrag();
+                self.dragging = null;
+            }
+            
             var ray = self.getMouseRay(event);
             var intersections = ray.intersectObjects(self.draggables);
             
@@ -62,19 +67,18 @@ function Plotter() {
         
     // Drags only the object that's being dragged.
     $(this.canvas).mousemove(function (event) {
-            if (self.dragging === null) {
-                return;
+            if (self.dragging !== null) {
+                var dx, dy;
+                if (event.originalEvent.hasOwnProperty("movementX")) {
+                    dx = event.originalEvent.movementX;
+                    dy = event.originalEvent.movementY;
+                } else {
+                    dx = event.originalEvent.mozMovementX;
+                    dy = event.originalEvent.mozMovementY;
+                }
+                
+                self.dragging.drag(dx, dy);
             }
-            var dx, dy;
-            if (event.originalEvent.hasOwnProperty("movementX")) {
-                dx = event.originalEvent.movementX;
-                dy = event.originalEvent.movementY;
-            } else {
-                dx = event.originalEvent.mozMovementX;
-                dy = event.originalEvent.mozMovementY;
-            }
-            
-            self.dragging.drag(dx, dy);
         });
         
     this.canvas.onmousewheel = function (event) {

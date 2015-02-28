@@ -264,13 +264,15 @@ Plot.prototype.quickUpdate = function () {
     and draw the correct data. The method is not guaranteed to call CALLBACK
     synchronously, though it might. */
 Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
-        var cache, cachedShaders;
+        var cache, cachedShaders, axis;
         if (summary) {
             cache = this.summaryCache;
             cachedShaders = this.summaryShaders;
+            axis = this.summaryXAxis;
         } else {
             cache = this.drawingCache;
             cachedShaders = this.shaders;
+            axis = this.xAxis;
         }
         
         // Compute the new point width exponent
@@ -297,8 +299,8 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
         var currUUID;
         
         var thisRequestID = ++this.drawRequestID;
-        var loRequestTime = roundTime(this.xAxis.domainLo.slice(0, 2));
-        var hiRequestTime = roundTime(this.xAxis.domainHi.slice(0, 2));
+        var loRequestTime = roundTime(axis.domainLo.slice(0, 2));
+        var hiRequestTime = roundTime(axis.domainHi.slice(0, 2));
         
         if (thisRequestID % 10 == 0) {
             this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 500000, 250000);
@@ -444,7 +446,6 @@ Plot.prototype.updateDefaultAxisRange = function () {
         Axis.prototype.rangeLo = this.plotspGeom.vertices[0].y;
         Axis.prototype.rangeHi = this.plotspGeom.vertices[3].y;
     };
-    
 
 Plot.prototype.drawGraph1 = function () {
         // Normally we'd draw the x axis here. For now, I'm going to skip that.
@@ -455,7 +456,19 @@ Plot.prototype.drawGraph1 = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph2();
-            }, false);
+            }, false, false);
+    };
+    
+Plot.prototype.drawSummary1 = function () {
+        // Normally we'd draw the x axis here. For now, I'm going to skip that.
+        this.startTime = this.plotter.selectedStartTime.slice(0);
+        this.endTime = this.plotter.selectedEndTime.slice(0);
+        this.summaryXAxis = new TimeAxis(this.startTime, this.endTime, this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x);
+        
+        var self = this;
+        this.fullUpdate(function () {
+                self.drawSummary2();
+            }, false, true);
     };
     
 Plot.prototype.drawGraph2 = function () {
@@ -491,7 +504,7 @@ Plot.prototype.drawGraph2 = function () {
                     if (maxval < minval) {
                         axis.setDomain(-10, 10);
                     } else if (maxval == minval) {
-                        axis.setDomain(maxval - 1, minval + 1);
+                        axis.setDomain(minval - 1, maxval + 1);
                     } else {
                         axis.setDomain(minval, maxval);
                     }
@@ -502,6 +515,37 @@ Plot.prototype.drawGraph2 = function () {
         this.updateDefaultAxisRange();
         
         this.drawGraph3();
+    };
+    
+Plot.prototype.drawSummary2 = function () {
+        var maxval = -Infinity;
+        var minval = Infinity;
+        for (var uuid in self.summaryCache) {
+            if (self.summaryCache.hasOwnProperty(uuid)) {
+                for (var k = 0; k < data.length; k++) {
+                    for (var i = 0; i < data[k].length; i++) {
+                        if (data[k][i][2] < minval) {
+                            minval = data[k][i][2];
+                        }
+                        if (data[k][i][4] > maxval) {
+                            maxval = data[k][i][4];
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (maxval < minval) {
+            minval = -10;
+            maxval = 10;
+        } else if (maxval == minval) {
+            minval -= 1;
+            maxval += 1;
+        }
+        
+        this.summaryYAxis = new Axis(minval, maxval, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y);
+        
+        this.drawSummary3();
     };
     
 Plot.prototype.drawGraph3 = function () {
@@ -636,6 +680,103 @@ Plot.prototype.drawGraph3 = function () {
         }
         for (var i = this.plot.children.length - 1; i >= meshNum; i++) {
             this.plot.remove(this.plot.children[i]);
+        }
+    };
+    
+Plot.prototype.drawSummary3 = function () {
+// This is where we actually draw the graph.
+        var THICKNESS = 0.15;
+        var data;
+        var rangegraph;
+        var mesh;
+        var meshNum = 0;
+        if (this.wvplot == undefined) {
+            this.wvplot = new THREE.Object3D();
+            this.plotter.scene.add(this.wvplot);
+        }
+        var cacheEntry;
+        var shaders, shader;
+        
+        var dispSettings;
+        
+        var axisnode, streamnode;
+        var axis, uuid;
+        
+        axis = this.summaryYAxis;
+        
+        var pwe, timeDelta, pixelShift;
+        affineMatrix = getAffineTransformMatrix(this.summaryXAxis, axis);
+        
+        for (uuid in this.summaryCache) {
+            if (this.summaryCache.hasOwnProperty(uuid)) {
+                cacheEntry = this.summaryCache[uuid];
+                cacheEntry.compressIfPossible();
+                
+                shaders = this.summaryShaders[uuid];
+                
+                dispSettings = this.plotter.settings.getSettings(uuid);
+                
+                pwe = cacheEntry.cached_drawing.pwe;
+                
+                timeDelta = expToPW(pwe - 1);
+                
+                pixelShift = this.summaryXAxis.map(addTimes(this.summaryXAxis.domainLo.slice(0, 2), timeDelta)) - this.summaryXAxis.rangeLo;
+                
+                if (cacheEntry.getLength() != 0) {
+                    graph = cacheEntry.cached_drawing.rangegraph;
+                    shader = shaders[1];
+                    shader.uniforms.affineMatrix.value = affineMatrix;
+                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                    shader.uniforms.color.value = dispSettings.color;
+                    shader.uniforms.alpha.value = dispSettings.selected ? 0.6 : 0.3;
+                    shader.uniforms.yDomainLo.value = axis.domainLo;
+                    shader.uniforms.xDomainLo1000.value = Math.floor(this.summaryXAxis.domainLo[0] / 1000000);
+                    shader.uniforms.xDomainLoMillis.value = this.summaryXAxis.domainLo[0] % 1000000;
+                    shader.uniforms.xDomainLoNanos.value = this.summaryXAxis.domainLo[1];
+                    shader.uniforms.horizPixelShift.value = pixelShift;
+                    
+                    if (meshNum < this.wvplot.children.length) {
+                        mesh = this.wvplot.children[meshNum];
+                    } else {
+                        mesh = new THREE.Mesh();
+                        mesh.frustumCulled = false;
+                        this.wvplot.add(mesh);
+                    }
+                    
+                    meshNum++;
+                    
+                    mesh.geometry = graph;
+                    mesh.material = shader;
+                    
+                    graph = cacheEntry.cached_drawing.graph;
+                    shader = shaders[0];
+                    shader.uniforms.affineMatrix.value = affineMatrix;
+                    shader.uniforms.color.value = dispSettings.color;
+                    shader.uniforms.rot90Matrix.value = this.rotator90;
+                    shader.uniforms.thickness.value = dispSettings.selected ? THICKNESS * 1.5 : THICKNESS;
+                    shader.uniforms.yDomainLo.value = axis.domainLo;
+                    shader.uniforms.xDomainLo1000.value = Math.floor(this.summaryXAxis.domainLo[0] / 1000000);
+                    shader.uniforms.xDomainLoMillis.value = this.summaryXAxis.domainLo[0] % 1000000;
+                    shader.uniforms.xDomainLoNanos.value = this.summaryXAxis.domainLo[1];
+                    shader.uniforms.horizPixelShift.value = pixelShift;
+                    
+                    if (meshNum < this.wvplot.children.length) {
+                        mesh = this.wvplot.children[meshNum];
+                    } else {
+                        mesh = new THREE.Mesh();
+                        mesh.frustumCulled = false;
+                        this.wvplot.add(mesh);
+                    }
+                    
+                    meshNum++;
+                    
+                    mesh.geometry = graph;
+                    mesh.material = shader;
+                }
+            }
+        }
+        for (var i = this.wvplot.children.length - 1; i >= meshNum; i++) {
+            this.wvplot.remove(this.wvplot.children[i]);
         }
     };
 

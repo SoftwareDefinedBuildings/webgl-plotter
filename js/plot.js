@@ -105,11 +105,6 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     this.updateWidth();
     
-    /*this.plotmarginOffsets = [new THREE.Vector3(this.plotmargin.left, this.plotmargin.bottom, 0),
-        new THREE.Vector3(-this.plotmargin.right, this.plotmargin.bottom, 0),
-        new THREE.Vector3(-this.plotmargin.right, -this.plotmargin.top, 0),
-        new THREE.Vector3(this.plotmargin.left, -this.plotmargin.top, 0)];*/
-    
     var material;
     // Detect clicks in the plot space. It's transparent but it's needed to detect mouse clicks.
     this.plotspGeom = new THREE.Geometry();
@@ -126,6 +121,21 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     plotsp.scroll = this.scrollPlot.bind(this);
     plotter.draggables.push(plotsp);
     plotter.scrollables.push(plotsp);
+    
+    // Detect clicks in the summmary plot space. Again, we use a transparent object to sense mouse clicks.
+    this.wvplotspGeom = new THREE.Geometry();
+    this.wvplotspGeom.vertices = this.plotbgGeom.vertices.slice(12, 16);
+    this.wvplotspGeom.faces.push(new THREE.Face3(0, 2, 1), new THREE.Face3(1, 2, 3));
+    material = new THREE.MeshBasicMaterial();
+    material.transparent = true;
+    material.opacity = 0;
+    var wvplotsp = new THREE.Mesh(this.wvplotspGeom, material);
+    plotter.scene.add(wvplotsp);
+    wvplotsp.startDrag = this.startDragWVPlot.bind(this);
+    wvplotsp.stopDrag = this.stopDragWVPlot.bind(this);
+    wvplotsp.drag = this.dragWVPlot.bind(this);
+    plotter.draggables.push(wvplotsp);
+    plotter.scrollables.push(wvplotsp);
     
     // Detect clicks in the plot drag area. It's transparent but it's needed to detect mouse clicks.
     this.plotdrGeom = new THREE.Geometry();
@@ -257,6 +267,10 @@ Plot.prototype.setWVPlot = function (y, topGap) {
 Plot.prototype.quickUpdate = function () {
         // Normally, I'd update the x-axis ticks here. But I'll implement that later
         this.drawGraph3();
+    };
+    
+Plot.prototype.quickUpdateSummary = function () {
+        this.drawSummary3();
     };
     
 /** Draw the graph with the new x-axis, accounting for the fact that the data
@@ -681,6 +695,7 @@ Plot.prototype.drawSummary3 = function () {
 
 Plot.prototype.updateWidth = function () {        
         this.plotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.plotmargin.left - this.plotmargin.right;
+        this.wvplotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.wvplotmargin.left - this.wvplotmargin.right;
         this.pixelsWideChanged();
         this.pixelsWideSummaryChanged();
     };
@@ -727,8 +742,8 @@ Plot.prototype.stopDragPlot = function () {
     
 Plot.prototype.dragPlot = function (deltaX, deltaY) {
         // Update the axis
-        var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
         this.recomputePixelsWideIfNecessary()
+        var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
         
         var xStart = trueDelta + this.xAxis.rangeLo;
         var deltaTime = subTimes(this.xAxis.unmap(xStart), this.xAxis.domainLo);
@@ -770,4 +785,33 @@ Plot.prototype.resizePlot = function (deltaX, deltaY) {
         this.updateDefaultAxisRange();
         this.drawGraph3();
         this.drawSummary3();
+    };
+    
+Plot.prototype.startDragWVPlot = function () {
+        this.scrollingWV = true;
+        var self = this;
+        this.fullUpdate(function () {
+                self.drawSummary3();
+            }, true, true);
+    };
+    
+Plot.prototype.stopDragWVPlot = function () {
+        this.scrollingWV = false;
+        var self = this;
+        this.fullUpdate(function () {
+                self.drawSummary3();
+            }, true, true);
+    };
+    
+Plot.prototype.dragWVPlot = function (deltaX, deltaY) {
+        this.recomputePixelsWideSummaryIfNecessary()
+        var trueDelta = (deltaX * this.wvplotspVirtualWidth / this.pixelsWideSummary);
+        
+        var xStart = trueDelta + this.summaryXAxis.rangeLo;
+        var deltaTime = subTimes(this.summaryXAxis.unmap(xStart), this.summaryXAxis.domainLo);
+        subTimes(this.summaryXAxis.domainLo, deltaTime);
+        subTimes(this.summaryXAxis.domainHi, deltaTime);
+        
+        // Update the screen
+        this.quickUpdateSummary();
     };

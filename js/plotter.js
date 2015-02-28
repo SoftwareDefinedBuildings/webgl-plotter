@@ -60,7 +60,7 @@ function Plotter() {
             }
         });
         
-    // Drags only the object that's being dragged
+    // Drags only the object that's being dragged.
     $(this.canvas).mousemove(function (event) {
             if (self.dragging === null) {
                 return;

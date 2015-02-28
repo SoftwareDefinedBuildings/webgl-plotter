@@ -450,15 +450,15 @@ Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endT
     };
     
 Plot.prototype.updateDefaultAxisRange = function () {
-        Axis.prototype.rangeLo = this.plotspGeom.vertices[0].y;
-        Axis.prototype.rangeHi = this.plotspGeom.vertices[3].y;
+        Axis.prototype.rangeLo = this.plotbgGeom.vertices[4].y;
+        Axis.prototype.rangeHi = this.plotbgGeom.vertices[7].y;
     };
 
 Plot.prototype.drawGraph1 = function () {
         // Normally we'd draw the x axis here. For now, I'm going to skip that.
         this.startTime = this.plotter.selectedStartTime.slice(0);
         this.endTime = this.plotter.selectedEndTime.slice(0);
-        this.xAxis = new TimeAxis(this.startTime, this.endTime, this.plotspGeom.vertices[0].x, this.plotspGeom.vertices[1].x);
+        this.xAxis = new TimeAxis(this.startTime, this.endTime, this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
         
         var self = this;
         this.fullUpdate(function () {
@@ -579,7 +579,7 @@ Plot.prototype.drawGraph3 = function () {
             }
         }
         
-        var ddAxis = new Axis(0, ddPlotMax, this.plotspGeom.vertices[3].y + 2, this.plotspGeom.vertices[3].y + 18);
+        var ddAxis = new Axis(0, ddPlotMax, this.plotbgGeom.vertices[7].y + 2, this.plotbgGeom.vertices[7].y + 18);
         
         var ddMatrix = getAffineTransformMatrix(this.xAxis, ddAxis);
         
@@ -695,8 +695,8 @@ Plot.prototype.pixelsWideSummaryChanged = function () {
     
 Plot.prototype.recomputePixelsWideIfNecessary = function () {
         if (isNaN(this.pixelsWide)) {
-            var leftVect = this.plotspGeom.vertices[0].clone().project(this.plotter.camera);
-            var rightVect = this.plotspGeom.vertices[1].clone().project(this.plotter.camera);
+            var leftVect = this.plotbgGeom.vertices[4].clone().project(this.plotter.camera);
+            var rightVect = this.plotbgGeom.vertices[5].clone().project(this.plotter.camera);
             this.pixelsWide = rightVect.sub(leftVect).length() * this.plotter.width / 2;
         }
     };

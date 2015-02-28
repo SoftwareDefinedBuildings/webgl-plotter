@@ -276,8 +276,7 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
         }
         
         // Compute the new point width exponent
-        var nanoDiff = this.endTime.slice(0);
-        subTimes(nanoDiff, this.startTime);
+        var nanoDiff = subTimes(axis.domainHi.slice(0), axis.domainLo);
         
         var pwe;
         
@@ -330,7 +329,11 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
                                             continue;
                                         }
                                         cacheEntry = cache[cacheUuid];
-                                        cacheEntry.inPrimaryCache = false;
+                                        if (summary) {
+                                            cacheEntry.inSummaryCache = false;
+                                        } else {
+                                            cacheEntry.inPrimaryCache = false;
+                                        }
                                         cacheEntry.disposeIfPossible();
                                         if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
                                             continue;
@@ -349,7 +352,11 @@ Plot.prototype.fullUpdate = function (callback, tempUpdate, summary) {
                                             continue;
                                         }
                                         var ce = newDrawingCache[cacheUuid];
-                                        ce.inPrimaryCache = true;
+                                        if (summary) {
+                                            ce.inSummaryCache = true;
+                                        } else {
+                                            ce.inPrimaryCache = true;
+                                        }
                                         if (!ce.hasOwnProperty("graph")) {
                                             ce.cacheDrawing(pwe);
                                         }
@@ -675,6 +682,7 @@ Plot.prototype.drawSummary3 = function () {
 Plot.prototype.updateWidth = function () {        
         this.plotspVirtualWidth = this.PLOTBG_VIRTUAL_WIDTH - this.plotmargin.left - this.plotmargin.right;
         this.pixelsWideChanged();
+        this.pixelsWideSummaryChanged();
     };
     
 Plot.prototype.pixelsWideChanged = function () {
@@ -706,7 +714,7 @@ Plot.prototype.startDragPlot = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
-            }, true);
+            }, true, false);
     };
     
 Plot.prototype.stopDragPlot = function () {
@@ -714,7 +722,7 @@ Plot.prototype.stopDragPlot = function () {
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
-            }, true);
+            }, true, false);
     };
     
 Plot.prototype.dragPlot = function (deltaX, deltaY) {
@@ -744,7 +752,7 @@ Plot.prototype.scrollPlot = function (amount) {
         // Update the screen
         this.fullUpdate(function () {
                 self.drawGraph3();
-            }, true);
+            }, true, false);
     };
     
 Plot.prototype.startResizePlot = function () {

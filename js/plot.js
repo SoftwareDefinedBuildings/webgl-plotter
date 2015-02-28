@@ -726,19 +726,17 @@ Plot.prototype.stopDragPlot = function () {
     };
     
 Plot.prototype.dragPlot = function (deltaX, deltaY) {
-        if (this.scrolling) {
-            // Update the axis
-            var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
-            this.recomputePixelsWideIfNecessary()
-            
-            var xStart = trueDelta + this.xAxis.rangeLo;
-            var deltaTime = subTimes(this.xAxis.unmap(xStart), this.xAxis.domainLo);
-            subTimes(this.xAxis.domainLo, deltaTime);
-            subTimes(this.xAxis.domainHi, deltaTime);
-            
-            // Update the screen
-            this.quickUpdate();
-        }
+        // Update the axis
+        var trueDelta = (deltaX * this.plotspVirtualWidth / this.pixelsWide);
+        this.recomputePixelsWideIfNecessary()
+        
+        var xStart = trueDelta + this.xAxis.rangeLo;
+        var deltaTime = subTimes(this.xAxis.unmap(xStart), this.xAxis.domainLo);
+        subTimes(this.xAxis.domainLo, deltaTime);
+        subTimes(this.xAxis.domainHi, deltaTime);
+        
+        // Update the screen
+        this.quickUpdate();
     };
     
 Plot.prototype.scrollPlot = function (amount) {
@@ -764,14 +762,12 @@ Plot.prototype.stopResizePlot = function () {
     };
     
 Plot.prototype.resizePlot = function (deltaX, deltaY) {
-        if (this.resizingPlot) {
-            // technically, we should divide the virtual height and true height; I'm assuming that the image isn't stretched somehow
-            var virtualDeltaY = deltaY * this.plotspVirtualWidth / this.pixelsWide;
-            this.setHeight(this.h + virtualDeltaY);
-            this.summaryYAxis.rangeLo -= virtualDeltaY;
-            this.summaryYAxis.rangeHi -= virtualDeltaY;
-            this.updateDefaultAxisRange();
-            this.drawGraph3();
-            this.drawSummary3();
-        }
+        // technically, we should divide the virtual height and true height; I'm assuming that the image isn't stretched somehow
+        var virtualDeltaY = deltaY * this.plotspVirtualWidth / this.pixelsWide;
+        this.setHeight(this.h + virtualDeltaY);
+        this.summaryYAxis.rangeLo -= virtualDeltaY;
+        this.summaryYAxis.rangeHi -= virtualDeltaY;
+        this.updateDefaultAxisRange();
+        this.drawGraph3();
+        this.drawSummary3();
     };

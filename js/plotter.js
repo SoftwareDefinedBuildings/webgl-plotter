@@ -42,23 +42,29 @@ function Plotter() {
         });
         
     // Support for the draggable interface
+    self.dragging = null; // the object that we're currently dragging
     $(this.canvas).mousedown(function (event) {
             var ray = self.getMouseRay(event);
             var intersections = ray.intersectObjects(self.draggables);
             
             if (intersections.length > 0) {
+                self.dragging = intersections[0].object;
                 intersections[0].object.startDrag();
             }
         });
         
     $(document).mouseup(function () {
-            for (var i = 0; i < self.draggables.length; i++) {
-                self.draggables[i].stopDrag();
+            if (self.dragging !== null) {
+                self.dragging.stopDrag();
+                self.dragging = null;
             }
         });
         
-    // Drags everything. That's why we have a startDrag and stopDrag; each object keeps track of its own state and takes action accordingly.
+    // Drags only the object that's being dragged
     $(this.canvas).mousemove(function (event) {
+            if (self.dragging === null) {
+                return;
+            }
             var dx, dy;
             if (event.originalEvent.hasOwnProperty("movementX")) {
                 dx = event.originalEvent.movementX;
@@ -68,9 +74,7 @@ function Plotter() {
                 dy = event.originalEvent.mozMovementY;
             }
             
-            for (var i = 0; i < self.draggables.length; i++) {
-                self.draggables[i].drag(dx, dy);
-            }
+            self.dragging.drag(dx, dy);
         });
         
     this.canvas.onmousewheel = function (event) {

@@ -758,8 +758,12 @@ Plot.prototype.stopResizePlot = function () {
 Plot.prototype.resizePlot = function (deltaX, deltaY) {
         if (this.resizingPlot) {
             // technically, we should divide the virtual height and true height; I'm assuming that the image isn't stretched somehow
-            this.setHeight(this.h + (deltaY  * this.plotspVirtualWidth / this.pixelsWide));
+            var virtualDeltaY = deltaY * this.plotspVirtualWidth / this.pixelsWide;
+            this.setHeight(this.h + virtualDeltaY);
+            this.summaryYAxis.rangeLo -= virtualDeltaY;
+            this.summaryYAxis.rangeHi -= virtualDeltaY;
             this.updateDefaultAxisRange();
             this.drawGraph3();
+            this.drawSummary3();
         }
     };

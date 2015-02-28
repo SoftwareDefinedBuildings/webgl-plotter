@@ -166,3 +166,18 @@ function packShaderUniforms(shader, affineMatrix, color, thickness, xAxis, yAxis
         shader.uniforms.alpha.value = alpha;
     }
 }
+
+/* Gets a the child of PARENT with index INDEX, creating a new mesh with frustumCulled set to false if necessary.
+   Then sets it GEOMETRY and MATERIAL. */
+function setMeshChild(parent, index, geometry, material) {
+    var obj;
+    if (index < parent.children.length) {
+        obj = parent.children[index];
+    } else {
+        obj = new THREE.Mesh();
+        obj.frustumCulled = false;
+        parent.add(obj);
+    }
+    obj.geometry = geometry;
+    obj.material = material;
+}

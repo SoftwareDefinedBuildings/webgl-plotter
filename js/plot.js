@@ -580,7 +580,7 @@ Plot.prototype.drawGraph3 = function () {
         var axisnode, streamnode;
         var axis, uuid;
         
-        var pwe, timeDelta, pixelShift;
+        var pwe, pixelShift;
         
         for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
             axis = axisnode.elem;
@@ -595,61 +595,24 @@ Plot.prototype.drawGraph3 = function () {
                     
                     dispSettings = this.plotter.settings.getSettings(uuid);
                     
-                    pwe = cacheEntry.cached_drawing.pwe;
-                    
-                    timeDelta = expToPW(pwe - 1);
-                    
-                    pixelShift = this.xAxis.map(addTimes(this.xAxis.domainLo.slice(0, 2), timeDelta)) - this.xAxis.rangeLo;
+                    if (pwe != cacheEntry.cached_drawing.pwe) {
+                        pwe = cacheEntry.cached_drawing.pwe;
+                        pixelShift = this.xAxis.getPixelShift(pwe);
+                    }
                     
                     if (cacheEntry.getLength() != 0) {
                         graph = cacheEntry.cached_drawing.rangegraph;
                         packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
-                        
-                        if (meshNum < this.plot.children.length) {
-                            mesh = this.plot.children[meshNum];
-                        } else {
-                            mesh = new THREE.Mesh();
-                            mesh.frustumCulled = false;
-                            this.plot.add(mesh);
-                        }
-                        
-                        meshNum++;
-                        
-                        mesh.geometry = graph;
-                        mesh.material = shaders[1];
+                        setMeshChild(this.plot, meshNum++, graph, shaders[1]);
                         
                         graph = cacheEntry.cached_drawing.graph;
                         packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, undefined, this.rotator90);
-                        
-                        if (meshNum < this.plot.children.length) {
-                            mesh = this.plot.children[meshNum];
-                        } else {
-                            mesh = new THREE.Mesh();
-                            mesh.frustumCulled = false;
-                            this.plot.add(mesh);
-                        }
-                        
-                        meshNum++;
-                        
-                        mesh.geometry = graph;
-                        mesh.material = shaders[0];
+                        setMeshChild(this.plot, meshNum++, graph, shaders[0]);
                     }
                     
                     graph = cacheEntry.cached_drawing.ddplot;
                     packShaderUniforms(shaders[2], ddMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 2 : THICKNESS, this.xAxis, ddAxis);
-                    
-                    if (meshNum < this.plot.children.length) {
-                        mesh = this.plot.children[meshNum];
-                    } else {
-                        mesh = new THREE.Mesh();
-                        mesh.frustumCulled = false;
-                        this.plot.add(mesh);
-                    }
-                    
-                    meshNum++;
-                    
-                    mesh.geometry = graph;
-                    mesh.material = shaders[2];
+                    setMeshChild(this.plot, meshNum++, graph, shaders[2]);
                 }
             }
         }
@@ -675,14 +638,11 @@ Plot.prototype.drawSummary3 = function () {
         var dispSettings;
         
         var axisnode, streamnode;
-        var axis, uuid;
         
-        axis = this.summaryYAxis;
+        var pwe, pixelShift;
+        affineMatrix = getAffineTransformMatrix(this.summaryXAxis, this.summaryYAxis);
         
-        var pwe, timeDelta, pixelShift;
-        affineMatrix = getAffineTransformMatrix(this.summaryXAxis, axis);
-        
-        for (uuid in this.summaryCache) {
+        for (var uuid in this.summaryCache) {
             if (this.summaryCache.hasOwnProperty(uuid)) {
                 cacheEntry = this.summaryCache[uuid];
                 cacheEntry.compressIfPossible();
@@ -691,44 +651,19 @@ Plot.prototype.drawSummary3 = function () {
                 
                 dispSettings = this.plotter.settings.getSettings(uuid);
                 
-                pwe = cacheEntry.cached_drawing.pwe;
-                
-                timeDelta = expToPW(pwe - 1);
-                
-                pixelShift = this.summaryXAxis.map(addTimes(this.summaryXAxis.domainLo.slice(0, 2), timeDelta)) - this.summaryXAxis.rangeLo;
+                if (pwe != cacheEntry.cached_drawing.pwe) {
+                    pwe = cacheEntry.cached_drawing.pwe;
+                    pixelShift = this.summaryXAxis.getPixelShift(pwe);
+                }
                 
                 if (cacheEntry.getLength() != 0) {
                     graph = cacheEntry.cached_drawing.rangegraph;
-                    packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, axis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
-                    
-                    if (meshNum < this.wvplot.children.length) {
-                        mesh = this.wvplot.children[meshNum];
-                    } else {
-                        mesh = new THREE.Mesh();
-                        mesh.frustumCulled = false;
-                        this.wvplot.add(mesh);
-                    }
-                    
-                    meshNum++;
-                    
-                    mesh.geometry = graph;
-                    mesh.material = shaders[1];
+                    packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
+                    setMeshChild(this.wvplot, meshNum++, graph, shaders[1]);
                     
                     graph = cacheEntry.cached_drawing.graph;
-                    packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, axis, pixelShift, undefined, this.rotator90)
-                    
-                    if (meshNum < this.wvplot.children.length) {
-                        mesh = this.wvplot.children[meshNum];
-                    } else {
-                        mesh = new THREE.Mesh();
-                        mesh.frustumCulled = false;
-                        this.wvplot.add(mesh);
-                    }
-                    
-                    meshNum++;
-                    
-                    mesh.geometry = graph;
-                    mesh.material = shaders[0];
+                    packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, undefined, this.rotator90)
+                    setMeshChild(this.wvplot, meshNum++, graph, shaders[0]);
                 }
             }
         }

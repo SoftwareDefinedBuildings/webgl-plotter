@@ -54,6 +54,10 @@ TimeAxis.prototype.unmap = function (y) {
         return addTimes(mulTime(hi, (y - this.rangeLo) / (this.rangeHi - this.rangeLo)), this.domainLo);
     };
     
+TimeAxis.prototype.getPixelShift = function (pwe) {
+        return this.map(addTimes(this.domainLo.slice(0, 2), expToPW(pwe - 1))) - this.rangeLo;
+    };
+    
 /** Given a TimeAxis the operates on x-coordinates and an Axis that operates on
     y-coordinates, returns a 4 x 4 matrix that performs the Affine Transform.
     Due to the fact that nanosecond timestamps cannot be represented exactly as

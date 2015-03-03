@@ -172,6 +172,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // used to keep track of caching data
     this.drawRequestID = 0;
+    this.summaryRequestID = 0;
     
     // test cursor
     var self = this;
@@ -318,7 +319,11 @@ Plot.prototype.fullUpdate = function (callback, summary) {
         var self = this;
         var currUUID;
         
-        var thisRequestID = ++this.drawRequestID;
+        if (summary) {
+            var thisRequestID = ++this.summaryRequestID;
+        } else {
+            var thisRequestID = ++this.drawRequestID;
+        }
         var loRequestTime = roundTime(axis.domainLo.slice(0, 2));
         var hiRequestTime = roundTime(axis.domainHi.slice(0, 2));
         
@@ -330,7 +335,11 @@ Plot.prototype.fullUpdate = function (callback, summary) {
             currUUID = streamnode.elem.uuid;
             this.dataCache.getData(currUUID, pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
-                            if (thisRequestID != self.drawRequestID) {
+                            if (summary) {
+                                if (thisRequestID != self.summaryRequestID) {
+                                    return; // another request has been made, so stop
+                                }
+                            } else if (thisRequestID != self.drawRequestID) {
                                 return; // another request has been made, so stop
                             }
                             
@@ -471,12 +480,29 @@ Plot.prototype.updateDefaultAxisRange = function () {
         Axis.prototype.rangeLo = this.plotbgGeom.vertices[4].y;
         Axis.prototype.rangeHi = this.plotbgGeom.vertices[7].y;
     };
+    
+/* Eventually, this will replace drawGraph1 and drawSummary1. */
+Plot.prototype.plotData = function () {
+        // TODO Draw the x-axis here
+        this.startTime = this.plotter.selectedStartTime.slice(0, 2);
+        this.endTime = this.plotter.selectedEndTime.slice(0, 2);
+        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
+        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x);
+        
+        var self = this;
+        this.fullUpdate(function () {
+                self.drawGraph2();
+                self.fullUpdate(function () {
+                        self.drawSummary2();
+                    }, true);
+            }, false);
+    };
 
 Plot.prototype.drawGraph1 = function () {
         // Normally we'd draw the x axis here. For now, I'm going to skip that.
-        this.startTime = this.plotter.selectedStartTime.slice(0);
-        this.endTime = this.plotter.selectedEndTime.slice(0);
-        this.xAxis = new TimeAxis(this.startTime, this.endTime, this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
+        this.startTime = this.plotter.selectedStartTime.slice(0, 2);
+        this.endTime = this.plotter.selectedEndTime.slice(0, 2);
+        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
         
         var self = this;
         this.fullUpdate(function () {
@@ -486,9 +512,9 @@ Plot.prototype.drawGraph1 = function () {
     
 Plot.prototype.drawSummary1 = function () {
         // Normally we'd draw the x axis here. For now, I'm going to skip that.
-        this.startTime = this.plotter.selectedStartTime.slice(0);
-        this.endTime = this.plotter.selectedEndTime.slice(0);
-        this.summaryXAxis = new TimeAxis(this.startTime, this.endTime, this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x);
+        this.startTime = this.plotter.selectedStartTime.slice(0, 2);
+        this.endTime = this.plotter.selectedEndTime.slice(0, 2);
+        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x);
         
         var self = this;
         this.fullUpdate(function () {
@@ -647,7 +673,7 @@ Plot.prototype.drawGraph3 = function () {
     };
     
 Plot.prototype.drawSummary3 = function () {
-// This is where we actually draw the graph.
+        // This is where we actually draw the graph.
         var THICKNESS = 0.15;
         var data;
         var rangegraph;

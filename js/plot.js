@@ -172,7 +172,15 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // used to keep track of caching data
     this.drawRequestID = 0;
+    
+    // test cursor
+    var self = this;
 }
+
+Plot.prototype.getVirtualToRealPixelRatio = function () {
+        this.recomputePixelsWideIfNecessary();
+        return this.plotspVirtualWidth / this.pixelsWide;
+    };
 
 Plot.prototype.setHeight = function (h) {
     h = h || this.h;

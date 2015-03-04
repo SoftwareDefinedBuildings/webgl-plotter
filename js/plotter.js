@@ -77,7 +77,9 @@ function Plotter() {
                     dy = event.originalEvent.mozMovementY;
                 }
                 
-                self.dragging.drag(dx, dy);
+                if (self.dragging !== null) {
+                    self.dragging.drag(dx, dy);
+                }
             }
         });
         

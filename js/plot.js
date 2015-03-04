@@ -31,6 +31,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.w = plotter.VIRTUAL_WIDTH;
     this.h = h;
     var SCREENZ = 0.01;
+    this.SCREENZ = SCREENZ;
     this.plotbgGeom.vertices.push(
             // four outer corner vertices (0 - 3): bl, br, tr, tl
             new THREE.Vector3(x + outermargin, y + outermargin, SCREENZ),
@@ -174,8 +175,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.drawRequestID = 0;
     this.summaryRequestID = 0;
     
-    // test cursor
-    var self = this;
+    // cursors for the summary plot
+    this.summary1 = null;
+    this.summary2 = null;
 }
 
 Plot.prototype.getVirtualToRealPixelRatio = function () {
@@ -493,9 +495,17 @@ Plot.prototype.plotData = function () {
         this.fullUpdate(function () {
                 self.drawGraph2();
                 self.fullUpdate(function () {
+                        self.initWVCursors();
                         self.drawSummary2();
                     }, true);
             }, false);
+    };
+    
+Plot.prototype.initWVCursors = function () {
+        this.cursor1 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeLo, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, function () { console.log("stop"); })
+        this.cursor1.addToPlotter(this.plotter);
+        this.cursor2 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeHi, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, function () { console.log("stop"); })
+        this.cursor2.addToPlotter(this.plotter);
     };
 
 Plot.prototype.drawGraph1 = function () {

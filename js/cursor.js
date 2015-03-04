@@ -1,4 +1,4 @@
-function Cursor(plotter, getVtoR, vertical, coord, orthCoord, cursorLength, halfThickness, z, stopDragCallback) {
+function Cursor(getVtoR, vertical, coord, orthCoord, cursorLength, halfThickness, z, stopDragCallback) {
     this.vertical = vertical;
     this.getRatio = getVtoR;
     this.coord = coord;
@@ -32,8 +32,21 @@ function Cursor(plotter, getVtoR, vertical, coord, orthCoord, cursorLength, half
 }
 
 Cursor.prototype.addToPlotter = function (plotter) {
+        this.plotter = plotter;
+        this.obj.mytype = "cursor";
         plotter.scene.add(this.obj);
         plotter.draggables.push(this.obj);
+    };
+    
+Cursor.prototype.removeFromPlotter = function () {
+        var plotter = this.plotter;
+        plotter.scene.remove(this.obj);
+        for (var i = 0; i < plotter.draggables.length; i++) {
+            if (plotter.draggables[i] == this.obj) {
+                plotter.draggables.splice(i, 1);
+                return;
+            }
+        }
     };
 
 Cursor.prototype.updateForCoord = function () {
@@ -86,5 +99,6 @@ Cursor.prototype.drag = function (deltaX, deltaY) {
     };
     
 Cursor.prototype.stopDrag = function () {
+        this.geom.computeBoundingSphere();
         this.stopDragCallback();
     };

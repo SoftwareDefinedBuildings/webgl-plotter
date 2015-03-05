@@ -84,6 +84,16 @@ Cursor.prototype.updateForLength = function () {
         }
         this.geom.verticesNeedUpdate = true;
     };
+
+Cursor.prototype.fullUpdateForCoord = function () {
+        this.updateForCoord();
+        this.geom.computeBoundingSphere();
+    };
+    
+Cursor.prototype.fullUpdateForLength = function () {
+        this.updateForLength();
+        this.geom.computeBoundingSphere();
+    };
     
 Cursor.prototype.startDrag = function () {
         this.vToR = this.getRatio();

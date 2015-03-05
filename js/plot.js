@@ -501,11 +501,50 @@ Plot.prototype.plotData = function () {
             }, false);
     };
     
+Plot.prototype.updateWVCursorsFromXAxis = function (full) {
+        this.wvcursor1.coord = this.summaryXAxis.map(this.xAxis.domainLo);
+        this.wvcursor2.coord = this.summaryXAxis.map(this.xAxis.domainHi);
+        if (full) {
+            this.wvcursor1.fullUpdateForCoord();
+            this.wvcursor2.fullUpdateForCoord();
+        } else {
+            this.wvcursor1.updateForCoord();
+            this.wvcursor2.updateForCoord();
+        }
+    };
+    
+Plot.prototype.updateXAxisFromWVCursors = function (full) {
+        var lowc, highc;
+        if (this.wvcursor2.coord < this.wvcursor1.coord) {
+            lowc = this.wvcursor2.coord;
+            highc = this.wvcursor1.coord;
+        } else {
+            lowc = this.wvcursor1.coord;
+            highc = this.wvcursor2.coord;
+        }
+        this.xAxis.domainLo = this.summaryXAxis.unmap(lowc);
+        this.xAxis.domainHi = this.summaryXAxis.unmap(highc);
+        
+        this.quickUpdate(); // In case we have to get data from the server
+        
+        if (full) {
+            var self = this;
+            this.fullUpdate(function () {
+                    self.drawGraph3();
+                }, false);
+        }
+            
+    };
+    
 Plot.prototype.initWVCursors = function () {
-        this.cursor1 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeLo, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, function () { console.log("stop"); })
-        this.cursor1.addToPlotter(this.plotter);
-        this.cursor2 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeHi, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, function () { console.log("stop"); })
-        this.cursor2.addToPlotter(this.plotter);
+        var self = this;
+        var update = function () {
+                self.updateXAxisFromWVCursors(true);
+            };
+        this.wvcursor1 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeLo, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, update);
+        this.wvcursor1.addToPlotter(this.plotter);
+        this.wvcursor2 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeHi, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, update);
+        this.wvcursor2.addToPlotter(this.plotter);
     };
 
 Plot.prototype.drawGraph1 = function () {
@@ -776,6 +815,7 @@ Plot.prototype.startDragPlot = function () {
 Plot.prototype.stopDragPlot = function () {
         this.scrolling = false;
         this.drawGraph3();
+        this.updateWVCursorsFromXAxis(true);
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
@@ -794,6 +834,7 @@ Plot.prototype.dragPlot = function (deltaX, deltaY) {
         
         // Update the screen
         this.quickUpdate();
+        this.updateWVCursorsFromXAxis(false);
     };
     
 Plot.prototype.scrollPlot = function (amount) {
@@ -803,9 +844,10 @@ Plot.prototype.scrollPlot = function (amount) {
         addTimes(this.xAxis.domainLo, currRange);
         subTimes(this.xAxis.domainHi, currRange);
         
-        this.drawGraph3();
-        var self = this;
         // Update the screen
+        this.quickUpdate();
+        this.updateWVCursorsFromXAxis(true);
+        var self = this;
         this.fullUpdate(function () {
                 self.drawGraph3();
             }, false);
@@ -842,6 +884,7 @@ Plot.prototype.startDragWVPlot = function () {
 Plot.prototype.stopDragWVPlot = function () {
         this.scrollingWV = false;
         this.drawSummary3();
+        this.updateXAxisFromWVCursors(true);
         var self = this;
         this.fullUpdate(function () {
                 self.drawSummary3();
@@ -859,4 +902,5 @@ Plot.prototype.dragWVPlot = function (deltaX, deltaY) {
         
         // Update the screen
         this.quickUpdateSummary();
+        this.updateXAxisFromWVCursors(false);
     };

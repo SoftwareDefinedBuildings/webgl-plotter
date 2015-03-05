@@ -54,7 +54,7 @@ function Plotter() {
             
             if (intersections.length > 0) {
                 self.dragging = intersections[0].object;
-                intersections[0].object.startDrag();
+                intersections[0].object.startDrag(intersections[0].point);
             }
         });
         

@@ -888,35 +888,52 @@ Plot.prototype.resizePlot = function (deltaX, deltaY) {
         this.drawSummary3();
     };
     
-Plot.prototype.startDragWVPlot = function () {
-        this.scrollingWV = true;
-        this.drawSummary3();
-        var self = this;
-        this.fullUpdate(function () {
-                self.drawSummary3();
-            }, true);
+Plot.prototype.startDragWVPlot = function (point) {
+        if ((point.x > this.wvcursor1.coord && point.x < this.wvcursor2.coord) || (point.x < this.wvcursor1.coord && point.x > this.wvcursor2.coord)) {
+            this.draggingV = true;
+            this.wvcursor1.startDrag(point);
+            this.wvcursor2.startDrag(point);
+        } else {
+            this.scrollingWV = true;
+            this.drawSummary3();
+            var self = this;
+            this.fullUpdate(function () {
+                    self.drawSummary3();
+                }, true);
+        }
     };
     
 Plot.prototype.stopDragWVPlot = function () {
-        this.scrollingWV = false;
-        this.drawSummary3();
-        this.updateXAxisFromWVCursors(true);
-        var self = this;
-        this.fullUpdate(function () {
-                self.drawSummary3();
-            }, true);
+        if (this.scrollingWV) {
+            this.scrollingWV = false;
+            this.drawSummary3();
+            this.updateXAxisFromWVCursors(true);
+            var self = this;
+            this.fullUpdate(function () {
+                    self.drawSummary3();
+                }, true);
+        } else if (this.draggingV) {
+            this.draggingV = false;
+            this.wvcursor1.stopDrag();
+            this.wvcursor2.stopDrag();
+        }
     };
     
 Plot.prototype.dragWVPlot = function (deltaX, deltaY) {
-        this.recomputePixelsWideSummaryIfNecessary()
-        var trueDelta = (deltaX * this.wvplotspVirtualWidth / this.pixelsWideSummary);
-        
-        var xStart = trueDelta + this.summaryXAxis.rangeLo;
-        var deltaTime = subTimes(this.summaryXAxis.unmap(xStart), this.summaryXAxis.domainLo);
-        subTimes(this.summaryXAxis.domainLo, deltaTime);
-        subTimes(this.summaryXAxis.domainHi, deltaTime);
-        
-        // Update the screen
-        this.quickUpdateSummary();
-        this.updateXAxisFromWVCursors(false);
+        if (this.scrollingWV) {
+            this.recomputePixelsWideSummaryIfNecessary()
+            var trueDelta = (deltaX * this.wvplotspVirtualWidth / this.pixelsWideSummary);
+            
+            var xStart = trueDelta + this.summaryXAxis.rangeLo;
+            var deltaTime = subTimes(this.summaryXAxis.unmap(xStart), this.summaryXAxis.domainLo);
+            subTimes(this.summaryXAxis.domainLo, deltaTime);
+            subTimes(this.summaryXAxis.domainHi, deltaTime);
+            
+            // Update the screen
+            this.quickUpdateSummary();
+            this.updateXAxisFromWVCursors(false);
+        } else if (this.draggingV) {
+            this.wvcursor1.drag(deltaX, deltaY);
+            this.wvcursor2.drag(deltaX, deltaY);
+        }
     };

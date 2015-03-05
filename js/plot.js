@@ -185,24 +185,32 @@ Plot.prototype.getVirtualToRealPixelRatio = function () {
         return this.plotspVirtualWidth / this.pixelsWide;
     };
 
+
+// After you're done changing the height, call FullUpdateForLength on each cursor so they're clickable again
 Plot.prototype.setHeight = function (h) {
-    h = h || this.h;
-    this.y = this.y + this.h - h;
-    this.h = h;
-    var newBottom = this.y + this.outermargin;
-    this.plotbgGeom.vertices[0].y = newBottom;
-    this.plotbgGeom.vertices[1].y = newBottom;
-    
-    this.plotbgGeom.vertices[4].y = this.y - this.outermargin + this.plotmargin.bottom;
-    this.plotbgGeom.vertices[5].y = this.y + this.outermargin + this.plotmargin.bottom;
-    this.plotbgGeom.vertices[12].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
-    this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
-    
-    this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
-    this.plotbgGeom.vertices[15].y = this.y + this.outermargin + this.wvplotmargin.bottom;
-    
-    this.plotbgGeom.verticesNeedUpdate = true;
-}
+        h = h || this.h;
+        this.y = this.y + this.h - h;
+        this.h = h;
+        var newBottom = this.y + this.outermargin;
+        this.plotbgGeom.vertices[0].y = newBottom;
+        this.plotbgGeom.vertices[1].y = newBottom;
+        
+        this.plotbgGeom.vertices[4].y = this.y - this.outermargin + this.plotmargin.bottom;
+        this.plotbgGeom.vertices[5].y = this.y + this.outermargin + this.plotmargin.bottom;
+        this.plotbgGeom.vertices[12].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+        this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
+        
+        this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
+        this.plotbgGeom.vertices[15].y = this.y + this.outermargin + this.wvplotmargin.bottom;
+        
+        var wvCursorOrth = this.y + this.outermargin + this.wvplotmargin.bottom;
+        this.wvcursor1.orthCoord = wvCursorOrth;
+        this.wvcursor2.orthCoord = wvCursorOrth;
+        this.wvcursor1.updateForLength();
+        this.wvcursor2.updateForLength();
+        
+        this.plotbgGeom.verticesNeedUpdate = true;
+    };
 
 Plot.prototype.setPlot = function (x, y, w, h) {
         if (x != undefined) {
@@ -235,6 +243,12 @@ Plot.prototype.setPlot = function (x, y, w, h) {
             this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
         }
         
+        var newWVCursorHeight = this.plotmargin.bottom - this.outermargin - this.wvplotmargin.top - this.wvplotmargin.bottom;
+        this.wvcursor1.cursorLength = newWVCursorHeight;
+        this.wvcursor2.cursorLength = newWVCursorHeight;
+        this.wvcursor1.updateForLength();
+        this.wvcursor2.updateForLength();
+        
         this.plotbgGeom.verticesNeedUpdate = true;
         this.plotspGeom.verticesNeedUpdate = true;
     };
@@ -264,7 +278,7 @@ Plot.prototype.setWVPlot = function (y, topGap) {
             this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
             this.plotbgGeom.vertices[15].y = this.y + this.outermargin + this.wvplotmargin.bottom;
         }
-        if (topGap != undeifned) {
+        if (topGap != undefined) {
             this.wvplotmargin.top = topGap;
             this.plotbgGeom.vertices[12].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
             this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
@@ -859,6 +873,8 @@ Plot.prototype.startResizePlot = function () {
     
 Plot.prototype.stopResizePlot = function () {
         this.resizingPlot = false;
+        this.wvcursor1.fullUpdateForLength();
+        this.wvcursor2.fullUpdateForLength();
     };
     
 Plot.prototype.resizePlot = function (deltaX, deltaY) {

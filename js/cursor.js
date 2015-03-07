@@ -1,11 +1,12 @@
-function Cursor(getVtoR, vertical, coord, orthCoord, cursorLength, halfThickness, z, stopDragCallback) {
+function Cursor(getVtoR, vertical, coord, orthCoord, cursorLength, halfThickness, z, dragCallback, stopDragCallback) {
     this.vertical = vertical;
     this.getRatio = getVtoR;
     this.coord = coord;
     this.orthCoord = orthCoord;
     this.cursorLength = cursorLength;
     this.halfThickness = halfThickness;
-    this.z = z
+    this.z = z;
+    this.dragCallback = dragCallback;
     this.stopDragCallback = stopDragCallback;
     
     this.vToR = undefined;
@@ -25,6 +26,8 @@ function Cursor(getVtoR, vertical, coord, orthCoord, cursorLength, halfThickness
     var material = new THREE.MeshBasicMaterial({color: 0x000000});
     
     this.obj = new THREE.Mesh(this.geom, material);
+    this.obj.frustumCulled = false;
+    // a cursor will be on the screen most of the time anyway, and we want it to appear even if we don't update the bounding sphere right away
     
     this.obj.startDrag = this.startDrag.bind(this);
     this.obj.drag = this.drag.bind(this);
@@ -99,11 +102,14 @@ Cursor.prototype.startDrag = function () {
         this.vToR = this.getRatio();
     };
     
-Cursor.prototype.drag = function (deltaX, deltaY) {
+Cursor.prototype.drag = function (deltaX, deltaY, suppressCallback) {
         if (this.vertical) {
             this.coord += deltaX * this.vToR;
         } else {
             this.coord -= deltaY * this.vToR;
+        }
+        if (!suppressCallback) {
+            this.dragCallback();
         }
         this.updateForCoord();
     };

@@ -555,9 +555,12 @@ Plot.prototype.initWVCursors = function () {
         var update = function () {
                 self.updateXAxisFromWVCursors(true);
             };
-        this.wvcursor1 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeLo, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, update);
+        var animate = function () {
+                self.updateXAxisFromWVCursors(false);
+            };
+        this.wvcursor1 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeLo, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, animate, update);
         this.wvcursor1.addToPlotter(this.plotter);
-        this.wvcursor2 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeHi, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, update);
+        this.wvcursor2 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeHi, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, animate, update);
         this.wvcursor2.addToPlotter(this.plotter);
     };
 
@@ -931,9 +934,9 @@ Plot.prototype.dragWVPlot = function (deltaX, deltaY) {
             
             // Update the screen
             this.quickUpdateSummary();
-            this.updateXAxisFromWVCursors(false);
         } else if (this.draggingV) {
-            this.wvcursor1.drag(deltaX, deltaY);
-            this.wvcursor2.drag(deltaX, deltaY);
+            this.wvcursor1.drag(deltaX, deltaY, true);
+            this.wvcursor2.drag(deltaX, deltaY, true);
         }
+        this.updateXAxisFromWVCursors(false);
     };

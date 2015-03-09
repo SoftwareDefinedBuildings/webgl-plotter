@@ -13,6 +13,9 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi) {
 Axis.prototype.rangeLo = 0;
 Axis.prototype.rangeHi = 1;
 
+Axis.prototype.THICKNESS = 0.1;
+Axis.prototype.AXISZ = 0.01;
+
 Axis.prototype.map = function (x) {
         return this.rangeLo + ((x - this.domainLo) / (this.domainHi - this.domainLo)) * (this.rangeHi - this.rangeLo);
     };
@@ -31,12 +34,26 @@ Axis.prototype.setRange = function (rangeLo, rangeHi) {
         this.rangeHi = rangeHi;
     };
     
-function TimeAxis (domainLo, domainHi, rangeLo, rangeHi) {
+function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y) {
     this.domainLo = domainLo;
     this.domainHi = domainHi;
     this.rangeLo = rangeLo;
     this.rangeHi = rangeHi;
+    
+    // The actual object that will be drawn
+    this.y = y;
+    this.geom = new THREE.Geometry();
+    this.geom.vertices.push(new THREE.Vector3(rangeLo, y + this.THICKNESS, this.AXISZ),
+        new THREE.Vector3(rangeLo, y - this.THICKNESS, this.AXISZ),
+        new THREE.Vector3(rangeHi, y - this.THICKNESS, this.AXISZ),
+        new THREE.Vector3(rangeHi, y + this.THICKNESS, this.AXISZ));
+    this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    var material = new THREE.MeshBasicMaterial({color: 0x000000});
+    this.obj = new THREE.Mesh(this.geom, material);
 }
+
+TimeAxis.prototype.THICKNESS = 0.5; // really half the thickness
+TimeAxis.prototype.AXISZ = 0.01;
 
 TimeAxis.prototype.map = function (x) {
         var time = x.slice(0);
@@ -56,6 +73,31 @@ TimeAxis.prototype.unmap = function (y) {
     
 TimeAxis.prototype.getPixelShift = function (pwe) {
         return this.map(addTimes(this.domainLo.slice(0, 2), expToPW(pwe - 1))) - this.rangeLo;
+    };
+    
+TimeAxis.prototype.updateY = function (y) {
+        this.y = y;
+        var vertices = this.geom.vertices;
+        vertices[0].y = y + this.THICKNESS;
+        vertices[1].y = y - this.THICKNESS;
+        vertices[2].y = y - this.THICKNESS;
+        vertices[3].y = y + this.THICKNESS;
+        this.geom.verticesNeedUpdate = true;
+    };
+    
+TimeAxis.prototype.updateRange = function (rangeLo, rangeHi) {
+        this.rangeLo = rangeLo || this.rangeLo;
+        this.rangeHi = rangeHi || this.rangeHi;
+        var vertices = this.geom.vertices;
+        vertices[0].x = this.rangeLo;
+        vertices[1].x = this.rangeLo;
+        vertices[2].x = this.rangeHi;
+        vertices[3].x = this.rangeHi;
+        this.geom.verticesNeedUpdate = true;
+    };
+    
+TimeAxis.prototype.addToPlotter = function (plotter) {
+        plotter.scene.add(this.obj);
     };
     
 /** Given a TimeAxis the operates on x-coordinates and an Axis that operates on

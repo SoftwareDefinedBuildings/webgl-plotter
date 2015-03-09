@@ -203,11 +203,14 @@ Plot.prototype.setHeight = function (h) {
         this.plotbgGeom.vertices[13].y = this.y + this.outermargin + this.wvplotmargin.bottom;
         this.plotbgGeom.vertices[15].y = this.y + this.outermargin + this.wvplotmargin.bottom;
         
+        this.xAxis.updateY(this.y + this.outermargin + this.plotmargin.bottom);
+        
         var wvCursorOrth = this.y + this.outermargin + this.wvplotmargin.bottom;
         this.wvcursor1.orthCoord = wvCursorOrth;
         this.wvcursor2.orthCoord = wvCursorOrth;
         this.wvcursor1.updateForLength();
         this.wvcursor2.updateForLength();
+        this.summaryXAxis.updateY(wvCursorOrth);
         
         this.plotbgGeom.verticesNeedUpdate = true;
     };
@@ -502,8 +505,10 @@ Plot.prototype.plotData = function () {
         // TODO Draw the x-axis here
         this.startTime = this.plotter.selectedStartTime.slice(0, 2);
         this.endTime = this.plotter.selectedEndTime.slice(0, 2);
-        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
-        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x);
+        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x, this.plotbgGeom.vertices[4].y);
+        this.xAxis.addToPlotter(this.plotter);
+        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x, this.plotbgGeom.vertices[15].y);
+        this.summaryXAxis.addToPlotter(this.plotter);
         
         var self = this;
         this.fullUpdate(function () {

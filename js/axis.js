@@ -43,13 +43,16 @@ function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y) {
     // The actual object that will be drawn
     this.y = y;
     this.geom = new THREE.Geometry();
-    this.geom.vertices.push(new THREE.Vector3(rangeLo, y + this.THICKNESS, this.AXISZ),
-        new THREE.Vector3(rangeLo, y - this.THICKNESS, this.AXISZ),
-        new THREE.Vector3(rangeHi, y - this.THICKNESS, this.AXISZ),
-        new THREE.Vector3(rangeHi, y + this.THICKNESS, this.AXISZ));
+    this.geom.vertices.push(new THREE.Vector3(rangeLo, this.THICKNESS, this.AXISZ),
+        new THREE.Vector3(rangeLo, -this.THICKNESS, this.AXISZ),
+        new THREE.Vector3(rangeHi, -this.THICKNESS, this.AXISZ),
+        new THREE.Vector3(rangeHi, this.THICKNESS, this.AXISZ));
     this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial({color: 0x000000});
-    this.obj = new THREE.Mesh(this.geom, material);
+    baseline = new THREE.Mesh(this.geom, material);
+    this.obj = new THREE.Object3D();
+    this.obj.add(baseline);
+    this.obj.translateY(y);
 }
 
 TimeAxis.prototype.THICKNESS = 0.5; // really half the thickness
@@ -76,13 +79,8 @@ TimeAxis.prototype.getPixelShift = function (pwe) {
     };
     
 TimeAxis.prototype.updateY = function (y) {
+        this.obj.translateY(y - this.y);
         this.y = y;
-        var vertices = this.geom.vertices;
-        vertices[0].y = y + this.THICKNESS;
-        vertices[1].y = y - this.THICKNESS;
-        vertices[2].y = y - this.THICKNESS;
-        vertices[3].y = y + this.THICKNESS;
-        this.geom.verticesNeedUpdate = true;
     };
     
 TimeAxis.prototype.updateRange = function (rangeLo, rangeHi) {

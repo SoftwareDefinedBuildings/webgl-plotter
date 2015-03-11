@@ -34,6 +34,14 @@ Axis.prototype.setRange = function (rangeLo, rangeHi) {
         this.rangeHi = rangeHi;
     };
     
+var MILLISECOND = 1;
+var SECOND = 1000 * MILLISECOND;
+var MINUTE = 60 * SECOND;
+var HOUR = 60 * MINUTE;
+var DAY = 24 * HOUR;
+var YEAR = 365.24 * DAY;
+var MONTH = YEAR / 12;
+    
 function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y) {
     this.domainLo = domainLo;
     this.domainHi = domainHi;
@@ -55,8 +63,25 @@ function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y) {
     this.obj.translateY(y);
 }
 
-TimeAxis.prototype.THICKNESS = 0.5; // really half the thickness
+TimeAxis.prototype.THICKNESS = 0.25; // really half the thickness
 TimeAxis.prototype.AXISZ = 0.01;
+
+TimeAxis.prototype.MAXTICKS = 7;
+TimeAxis.prototype.MILLITICKINTERVALS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
+TimeAxis.prototype.MAXNANOTICK = 500000;
+TimeAxis.prototype.MAXMILLITICK = 500;
+
+TimeAxis.prototype.SECTICKINTERVALS = [1, 2, 5, 10, 20, 30];
+TimeAxis.prototype.MAXSECTICK = 30;
+
+TimeAxis.prototype.HOURTICKINTERVALS = [1, 2, 3, 4, 6, 12];
+TimeAxis.prototype.MAXHOURTICK = 12;
+
+TimeAxis.prototype.DAYTICKINTERVALS = [1, 2, 4, 7, 14];
+TimeAxis.prototype.MAXDAYTICK = 14;
+
+TimeAxis.prototype.MONTHTICKINTERVALS = [1, 2, 3, 6];
+TimeAxis.prototype.MAXMONTHTICK = 6;
 
 TimeAxis.prototype.map = function (x) {
         var time = x.slice(0);
@@ -96,6 +121,129 @@ TimeAxis.prototype.updateRange = function (rangeLo, rangeHi) {
     
 TimeAxis.prototype.addToPlotter = function (plotter) {
         plotter.scene.add(this.obj);
+    };
+    
+/* Returns a list of Ticks describing where the ticks should go. */
+TimeAxis.prototype.getTicks = function () {
+        var delta = subTimes(this.domainHi.slice(0, 2), this.domainLo);
+        var millidelta = delta[0] + delta[1] / 1000000;
+        var nanodelta = 1000000 * delta[0] + delta[1];
+        
+        var starttick;
+        var deltatick;
+        
+        var month = false;
+        var year = false;
+        
+        // First find deltatick. In the case of months and years, which are of variable length, just find the number of months or years.
+        if (nanodelta <= this.MAXNANOTICK * this.MAXTICKS) {
+            // deltatick is small enough to be measured in nanoseconds
+            deltatick = [0, this.getTickDelta(this.MILLITICKINTERVALS, nanodelta)];
+        } else if (millidelta <= this.MAXMILLITICK * this.MAXTICKS) {
+            // deltatick is measured in milliseconds
+            deltatick = [this.getTickDelta(this.MILLITICKINTERVALS, millidelta), 0];
+        } else if (millidelta / SECOND <= this.MAXSECTICK * this.MAXTICKS) {
+            deltatick = [this.getTickDelta(this.SECTICKINTERVALS, millidelta / SECOND) * SECOND, 0];
+        } else if (millidelta / MINUTE <= this.MAXSECTICK * this.MAXTICKS) {
+            deltatick = [this.getTickDelta(this.SECTICKINTERVALS, millidelta / MINUTE) * MINUTE, 0];
+        } else if (millidelta / HOUR <= this.MAXHOURTICK * this.MAXTICKS) {
+            deltatick = [this.getTickDelta(this.HOURTICKINTERVALS, millidelta / HOUR) * HOUR, 0];
+        } else if (millidelta / DAY <= this.MAXDAYTICK * this.MAXTICKS) {
+            deltatick = [this.getTickDelta(this.DAYTICKINTERVALS, millidelta / DAY) * DAY, 0];
+        } else if (millidelta / MONTH <= this.MAXMONTHTICK * this.MAXTICKS) {
+            deltatick = this.getTickDelta(this.MONTHTICKINTERVALS, millidelta / MONTH);
+            month = true;
+        } else {
+            deltatick = this.getTickDelta(this.MONTHTICKINTERVALS, millidelta / YEAR);
+            year = true;
+        }
+    };
+    
+/* Say the current axis spans SPAN units. Returns how far apart the ticks should be. */
+TimeAxis.prototype.getTickDelta = function (span, intervals) {
+        var idealWidth = span / this.MAXTICKS; // How wide the tick would be if we didn't care about corresponding to units of time
+        var tickIndex = binSearch(intervals, idealWidth, function (x) { return x; });
+        if (idealWidth < intervals[tickIndex]) {
+            tickIndex--;
+        }
+        return this.intervals[tickIndex];
+    };
+    
+function Tick(time, date, granularity) {
+        this.time = time;
+        this.date = date;
+        this.granularity = granularity;
+    };
+    
+Tick.prototype.getLabel = function (translate, granularity) {
+        var prefix = "";
+        var number;
+        var suffix = "";
+        var first = false;
+        switch (granularity || this.granularity) {
+        case "year":
+            number = this.date.getFullYear();
+            break;
+        case "month":
+            number = this.date.getMonth();
+            if (number == 0) {
+                first = "year";
+            }
+            break;
+        case "day":
+            number = this.date.getDate();
+            if (number == 0) {
+                first = "month";
+                break;
+            }
+            suffix = " " + translate.trDay(this.date.getDay());
+            break;
+        case "hour":
+            number = this.date.getHours();
+            if (number == 0) {
+                first = "day";
+                break;
+            }
+            suffix = number < 12 ? " AM" : " PM";
+            number %= 12;
+            break;
+        case "minute":
+            number = this.date.getMinutes();
+            if (number == 0) {
+                first = "hour";
+                break;
+            }
+            prefix = this.date.getHours() + ":";
+            break;
+        case "second":
+            number = this.date.getSeconds();
+            if (number == 0) {
+                first = "minute";
+                break;
+            }
+            prefix = ":";
+            break;
+        case "millisecond":
+            number = this.date.getMilliseconds();
+            if (number == 0) {
+                first = "second";
+                break;
+            }
+            prefix = ".";
+            break;
+        case "nanosecond":
+            number = this.time[1];
+            if (number == 0) {
+                first = "millisecond";
+                break;
+            }
+            prefix = ",";
+            break;
+        }
+        if (first) {
+            return this.getLabel(translate, first);
+        }
+        return prefix + number + first;
     };
     
 /** Given a TimeAxis the operates on x-coordinates and an Axis that operates on

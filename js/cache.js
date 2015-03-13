@@ -58,22 +58,22 @@ CacheEntry.prototype.compressIfPossible = function () {
         var rangegraph = this.cached_drawing.rangegraph;
         var ddplot = this.cached_drawing.ddplot;
         if (graph.vertices.length > 0 && !graph.verticesNeedUpdate) {
-            graph.vertices = [];
+            //graph.vertices = [];
         }
         if (graph.faces.length > 0 && !graph.elementsNeedUpdate) {
-            graph.faces = [];
+            //graph.faces = [];
         }
         if (rangegraph.vertices.length > 0 && !rangegraph.verticesNeedUpdate) {
-            rangegraph.vertices = [];
+            //rangegraph.vertices = [];
         }
         if (rangegraph.faces.length > 0 && !rangegraph.elementsNeedUpdate) {
-            rangegraph.faces = [];
+            //rangegraph.faces = [];
         }
         if (ddplot.vertices.length > 0 && !ddplot.verticesNeedUpdate) {
-            ddplot.vertices = [];
+            //ddplot.vertices = [];
         }
         if (ddplot.faces.length > 0 && !ddplot.elementsNeedUpdate) {
-            ddplot.faces = [];
+            //ddplot.faces = [];
         }
     };
     
@@ -183,6 +183,7 @@ function validateContiguous(cacheEntry, pwe) {
    
    */
 Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
+        //alert("got request");
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
         
         var queryStart = startTime;
@@ -237,7 +238,9 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
             cache = [];
             dataCache[uuid][pointwidthexp] = cache;
         }
+        
         var indices = getIndices(cache, startTime, endTime);
+        //alert("got indices");
         var i = indices[0];
         var j = indices[1];
         var startsBefore = indices[2];
@@ -851,10 +854,10 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
         
         if (prevGap) {
-            normals[vertexID - 4] = CacheEntry.topDirMarked;
-            normals[vertexID - 3] = CacheEntry.bottomDirMarked;
-            normals[vertexID - 2] = CacheEntry.rightDirMarked;
-            normals[vertexID - 1] = CacheEntry.leftDirMarked;
+            normals[vertexID - 6] = CacheEntry.topDirMarked;
+            normals[vertexID - 5] = CacheEntry.bottomDirMarked;
+            normals[vertexID - 4] = CacheEntry.rightDirMarked;
+            normals[vertexID - 3] = CacheEntry.leftDirMarked;
         }
         graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 3, vertexID - 2));
         graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 1, vertexID - 3));

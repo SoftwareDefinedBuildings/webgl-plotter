@@ -293,6 +293,7 @@ Plot.prototype.setWVPlot = function (y, topGap) {
     read the first level of cache and draw that same data on the new axis. */
 Plot.prototype.quickUpdate = function () {
         // Normally, I'd update the x-axis ticks here. But I'll implement that later
+        this.xAxis.updateTicks();
         this.drawGraph3();
     };
     
@@ -428,6 +429,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                         shader.attributes.normalVector.needsUpdate = true;
                                         shader.attributes.timeNanos.needsUpdate = true;
                                         rangeshader.attributes.timeNanos.needsUpdate = true;
+                                        rangeshader.attributes.rangePerturb.needsUpdate = true;
                                         ddshader.attributes.normalVector.needsUpdate = true;
                                         ddshader.attributes.timeNanos.needsUpdate = true;
                                     }
@@ -440,6 +442,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                 } else {
                                     self.drawingCache = newDrawingCache;
                                 }
+                                
                                 callback();
                             }
                         };
@@ -505,9 +508,9 @@ Plot.prototype.plotData = function () {
         // TODO Draw the x-axis here
         this.startTime = this.plotter.selectedStartTime.slice(0, 2);
         this.endTime = this.plotter.selectedEndTime.slice(0, 2);
-        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x, this.plotbgGeom.vertices[4].y);
+        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x, this.plotbgGeom.vertices[4].y, this.plotter.translator);
         this.xAxis.addToPlotter(this.plotter);
-        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x, this.plotbgGeom.vertices[15].y);
+        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x, this.plotbgGeom.vertices[15].y, this.plotter.translator);
         this.summaryXAxis.addToPlotter(this.plotter);
         
         var self = this;
@@ -722,7 +725,7 @@ Plot.prototype.drawGraph3 = function () {
                         pixelShift = this.xAxis.getPixelShift(pwe);
                     }
                     
-                    if (cacheEntry.getLength() != 0) {
+                    if (cacheEntry.getLength() > 0) {
                         graph = cacheEntry.cached_drawing.rangegraph;
                         packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
                         setMeshChild(this.plot, meshNum++, graph, shaders[1]);
@@ -730,11 +733,14 @@ Plot.prototype.drawGraph3 = function () {
                         graph = cacheEntry.cached_drawing.graph;
                         packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, undefined, this.rotator90);
                         setMeshChild(this.plot, meshNum++, graph, shaders[0]);
+                    } else {
+                        meshNum += 2;
                     }
                     
                     graph = cacheEntry.cached_drawing.ddplot;
                     packShaderUniforms(shaders[2], ddMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 2 : THICKNESS, this.xAxis, ddAxis);
                     setMeshChild(this.plot, meshNum++, graph, shaders[2]);
+                    
                 }
             }
         }
@@ -786,6 +792,8 @@ Plot.prototype.drawSummary3 = function () {
                     graph = cacheEntry.cached_drawing.graph;
                     packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, undefined, this.rotator90)
                     setMeshChild(this.wvplot, meshNum++, graph, shaders[0]);
+                } else {
+                    meshNum += 2;
                 }
             }
         }
@@ -865,7 +873,6 @@ Plot.prototype.scrollPlot = function (amount) {
         mulTime(currRange, amount / 1000);
         addTimes(this.xAxis.domainLo, currRange);
         subTimes(this.xAxis.domainHi, currRange);
-        
         // Update the screen
         this.quickUpdate();
         this.updateWVCursorsFromXAxis(true);
@@ -873,6 +880,7 @@ Plot.prototype.scrollPlot = function (amount) {
         this.fullUpdate(function () {
                 self.drawGraph3();
             }, false);
+        
     };
     
 Plot.prototype.startResizePlot = function () {

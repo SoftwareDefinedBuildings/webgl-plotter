@@ -42,7 +42,7 @@ var DAY = 24 * HOUR;
 var YEAR = 365.24 * DAY;
 var MONTH = YEAR / 12;
     
-function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y) {
+function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y, translator) {
     this.domainLo = domainLo;
     this.domainHi = domainHi;
     this.rangeLo = rangeLo;
@@ -61,6 +61,9 @@ function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y) {
     this.obj = new THREE.Object3D();
     this.obj.add(baseline);
     this.obj.translateY(y);
+    
+    this.tickObjs = []; // an array of objects that physically represent the ticks
+    this.translator = translator;
 }
 
 TimeAxis.prototype.THICKNESS = 0.25; // really half the thickness
@@ -82,6 +85,9 @@ TimeAxis.prototype.MAXDAYTICK = 14;
 
 TimeAxis.prototype.MONTHTICKINTERVALS = [1, 2, 3, 6];
 TimeAxis.prototype.MAXMONTHTICK = 6;
+
+TimeAxis.prototype.TICKLENGTH = 2; // the length of each tick in virtual coordinates
+TimeAxis.prototype.TICKLABELSIZE = 3;
 
 TimeAxis.prototype.map = function (x) {
         var time = x.slice(0);
@@ -123,112 +129,232 @@ TimeAxis.prototype.addToPlotter = function (plotter) {
         plotter.scene.add(this.obj);
     };
     
+TimeAxis.prototype.updateTicks = function () {
+        var ticks = this.getTicks();
+        var coord, geom, obj, textgeom, textobj;
+        var i;
+        for (i = 0; i < ticks.length; i++) {
+            coord = this.map(ticks[i].time);
+            if (i < this.tickObjs.length) {
+                obj = this.tickObjs[i];
+                obj.translateX(coord - obj.userData.coord);
+                obj.userData.coord = coord;
+                textgeom = obj.children[1].geometry;
+                obj.remove(obj.children[1]);
+                textgeom.dispose();
+            } else {
+                geom = new THREE.Geometry();
+                geom.vertices.push(new THREE.Vector3(-this.THICKNESS, this.TICKLENGTH, this.AXISZ),
+                    new THREE.Vector3(-this.THICKNESS, 0, this.AXISZ),
+                    new THREE.Vector3(this.THICKNESS, 0, this.AXISZ),
+                    new THREE.Vector3(this.THICKNESS, this.TICKLENGTH, this.AXISZ));
+                geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+                obj = new THREE.Object3D();
+                obj.add(new THREE.Mesh(geom, new THREE.MeshBasicMaterial({color: 0x000000})));
+                this.tickObjs.push(obj);
+                this.obj.add(obj);
+                obj.translateX(coord);
+                obj.userData.coord = coord;
+            }
+            textgeom = new THREE.TextGeometry(ticks[i].getLabel(this.translator), {size: this.TICKLABELSIZE, height: this.AXISZ});
+            textobj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
+            textobj.translateX(this.THICKNESS * 2);
+            textobj.translateY(this.THICKNESS * 2);
+            obj.add(textobj);
+        }
+        for (var j = this.tickObjs.length - 1; j >= i; j--) {
+            obj = this.tickObjs.pop();
+            this.obj.remove(obj);
+            obj.children[0].geometry.dispose();
+            //obj.children[1].geometry.dispose();
+        }
+        
+    };
+    
 /* Returns a list of Ticks describing where the ticks should go. */
 TimeAxis.prototype.getTicks = function () {
         var delta = subTimes(this.domainHi.slice(0, 2), this.domainLo);
         var millidelta = delta[0] + delta[1] / 1000000;
         var nanodelta = 1000000 * delta[0] + delta[1];
         
-        var starttick;
+        var starttime;
         var deltatick;
         
-        var month = false;
-        var year = false;
+        var granularity;
         
         // First find deltatick. In the case of months and years, which are of variable length, just find the number of months or years.
         if (nanodelta <= this.MAXNANOTICK * this.MAXTICKS) {
             // deltatick is small enough to be measured in nanoseconds
             deltatick = [0, this.getTickDelta(this.MILLITICKINTERVALS, nanodelta)];
+            granularity = "nanosecond";
         } else if (millidelta <= this.MAXMILLITICK * this.MAXTICKS) {
             // deltatick is measured in milliseconds
-            deltatick = [this.getTickDelta(this.MILLITICKINTERVALS, millidelta), 0];
+            deltatick = this.getTickDelta(this.MILLITICKINTERVALS, millidelta);
+            granularity = "millisecond";
         } else if (millidelta / SECOND <= this.MAXSECTICK * this.MAXTICKS) {
-            deltatick = [this.getTickDelta(this.SECTICKINTERVALS, millidelta / SECOND) * SECOND, 0];
+            deltatick = this.getTickDelta(this.SECTICKINTERVALS, millidelta / SECOND) * SECOND;
+            granularity = "second";
         } else if (millidelta / MINUTE <= this.MAXSECTICK * this.MAXTICKS) {
-            deltatick = [this.getTickDelta(this.SECTICKINTERVALS, millidelta / MINUTE) * MINUTE, 0];
+            deltatick = this.getTickDelta(this.SECTICKINTERVALS, millidelta / MINUTE) * MINUTE;
+            granularity = "minute";
         } else if (millidelta / HOUR <= this.MAXHOURTICK * this.MAXTICKS) {
-            deltatick = [this.getTickDelta(this.HOURTICKINTERVALS, millidelta / HOUR) * HOUR, 0];
+            deltatick = this.getTickDelta(this.HOURTICKINTERVALS, millidelta / HOUR) * HOUR;
+            granularity = "hour";
         } else if (millidelta / DAY <= this.MAXDAYTICK * this.MAXTICKS) {
-            deltatick = [this.getTickDelta(this.DAYTICKINTERVALS, millidelta / DAY) * DAY, 0];
+            deltatick = this.getTickDelta(this.DAYTICKINTERVALS, millidelta / DAY) * DAY;
+            granularity = "day";
         } else if (millidelta / MONTH <= this.MAXMONTHTICK * this.MAXTICKS) {
             deltatick = this.getTickDelta(this.MONTHTICKINTERVALS, millidelta / MONTH);
-            month = true;
+            granularity = "month";
         } else {
-            deltatick = this.getTickDelta(this.MONTHTICKINTERVALS, millidelta / YEAR);
-            year = true;
+            deltatick = this.getTickDelta(this.MILLITICKINTERVALS, millidelta / YEAR);
+            granularity = "year";
         }
+        
+        var ticks = [];
+        var curryear, currmonth;
+        var date;
+        
+        // Now, generate the actual ticks.
+        var firstdate = new Date(this.domainLo[0]);
+        switch (granularity) {
+        case "nanosecond":
+            starttime = this.domainLo.slice(0, 2);
+            date = new Date(this.domainLo[0]);
+            starttime[1] = Math.ceil(starttime[1] / deltatick[1]) * deltatick[1];
+            if (starttime[1] >= 1000000) {
+                starttime[0] += Math.floor(starttime[1] / 1000000)
+                starttime[1] %= 1000000;
+            }
+            while (cmpTimes(starttime, this.domainHi) <= 0) {
+                ticks.push(new Tick(starttime, date, granularity));
+                starttime = addTimes(starttime.slice(0, 2), deltatick);
+            }
+            break;
+        case "year":
+            curryear = firstdate.getUTCFullYear();
+            date = new Date(curryear, 0);
+            if (this.domainLo[0] == date.getTime()) { // in case the low range of the domain falls exactly on a year boundary
+                curryear++;
+                date = new Date(curryear, 0);
+            }
+            while (date.getTime() <= this.domainHi[0]) {
+                ticks.push(new Tick([date.getTime(), 0], date, granularity));
+                curryear += deltatick;
+                date = new Date(curryear, 0);
+            }
+            break;
+        case "month":
+            curryear = firstdate.getUTCFullYear();
+            currmonth = firstdate.getUTCMonth();
+            date = new Date(curryear, currmonth);
+            if (this.domainLo[0] == date.getTime()) { // in case the low range of the domain falls exactly on a month boundary
+                currmonth++;
+                if (currmonth == 12) {
+                    currmonth = 0;
+                    curryear++;
+                }
+                date = new Date(curryear, currmonth);
+            }
+            while (date.getTime() <= this.domainHi[0]) {
+                ticks.push(new Tick([date.getTime(), 0], date, granularity));
+                currmonth += deltatick;
+                if (currmonth >= 12) {
+                    curryear += Math.floor(currmonth / 12);
+                    currmonth %= 12;
+                }
+                date = new Date(curryear, currmonth);
+            }
+            break;
+        default:
+            starttime = Math.ceil(this.domainLo[0] / deltatick) * deltatick;
+            date = new Date(starttime);
+            while (starttime <= this.domainHi[0]) {
+                ticks.push(new Tick([date.getTime(), 0], date, granularity));
+                starttime += deltatick;
+                date = new Date(starttime);
+            }
+        }
+        
+        return ticks;
     };
     
-/* Say the current axis spans SPAN units. Returns how far apart the ticks should be. */
-TimeAxis.prototype.getTickDelta = function (span, intervals) {
+/* Say the current axis spans SPAN units. Returns how far apart the ticks should be, as the index in the INTERVALS array. */
+TimeAxis.prototype.getTickDelta = function (intervals, span) {
         var idealWidth = span / this.MAXTICKS; // How wide the tick would be if we didn't care about corresponding to units of time
         var tickIndex = binSearch(intervals, idealWidth, function (x) { return x; });
-        if (idealWidth < intervals[tickIndex]) {
-            tickIndex--;
+        if (idealWidth > intervals[tickIndex] && tickIndex < intervals.length) {
+            tickIndex++;
         }
-        return this.intervals[tickIndex];
+        return intervals[tickIndex];
     };
     
+/* Logically representation of a tick. */
 function Tick(time, date, granularity) {
         this.time = time;
         this.date = date;
         this.granularity = granularity;
     };
     
-Tick.prototype.getLabel = function (translate, granularity) {
+Tick.prototype.getLabel = function (translator, granularity) {
         var prefix = "";
         var number;
         var suffix = "";
         var first = false;
         switch (granularity || this.granularity) {
         case "year":
-            number = this.date.getFullYear();
+            number = this.date.getUTCFullYear();
             break;
         case "month":
-            number = this.date.getMonth();
+            number = this.date.getUTCMonth();
             if (number == 0) {
                 first = "year";
+                break;
             }
+            number = translator.trMonth(number);
             break;
         case "day":
-            number = this.date.getDate();
-            if (number == 0) {
+            number = this.date.getUTCDate();
+            if (number == 1) {
                 first = "month";
                 break;
             }
-            suffix = " " + translate.trDay(this.date.getDay());
+            suffix = " " + translator.trDay(this.date.getUTCDay());
             break;
         case "hour":
-            number = this.date.getHours();
+            number = this.date.getUTCHours();
             if (number == 0) {
                 first = "day";
                 break;
             }
             suffix = number < 12 ? " AM" : " PM";
-            number %= 12;
+            number = ((number - 1) % 12) + 1;
             break;
         case "minute":
-            number = this.date.getMinutes();
+            number = this.date.getUTCMinutes();
             if (number == 0) {
                 first = "hour";
                 break;
             }
-            prefix = this.date.getHours() + ":";
+            number = ("0" + number).substr(-2);
+            prefix = this.date.getUTCHours() + ":";
             break;
         case "second":
-            number = this.date.getSeconds();
+            number = this.date.getUTCSeconds();
             if (number == 0) {
                 first = "minute";
                 break;
             }
+            number = ("0" + number).substr(-2);
             prefix = ":";
             break;
         case "millisecond":
-            number = this.date.getMilliseconds();
+            number = this.date.getUTCMilliseconds();
             if (number == 0) {
                 first = "second";
                 break;
             }
+            number = ("00" + number).substr(-3);
             prefix = ".";
             break;
         case "nanosecond":
@@ -237,13 +363,14 @@ Tick.prototype.getLabel = function (translate, granularity) {
                 first = "millisecond";
                 break;
             }
+            number = ("00000" + number).substr(-6);
             prefix = ",";
             break;
         }
         if (first) {
-            return this.getLabel(translate, first);
+            return this.getLabel(translator, first);
         }
-        return prefix + number + first;
+        return prefix + number + suffix;
     };
     
 /** Given a TimeAxis the operates on x-coordinates and an Axis that operates on

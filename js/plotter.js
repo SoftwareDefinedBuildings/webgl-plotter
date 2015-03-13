@@ -8,6 +8,8 @@ function Plotter() {
     this.draggables = [];
     this.scrollables = [];
     
+    this.translator = new Translator("English");
+    
     this.VIRTUAL_WIDTH = 200; // The width of the plotter in virtual coordinates
     
     var self = this; // for callbacks where "this" is different

@@ -64,6 +64,8 @@ function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y, translator) {
     
     this.tickObjs = []; // an array of objects that physically represent the ticks
     this.translator = translator;
+    
+    this.tgp = new TickGeomPool();
 }
 
 TimeAxis.prototype.THICKNESS = 0.25; // really half the thickness
@@ -131,7 +133,7 @@ TimeAxis.prototype.addToPlotter = function (plotter) {
     
 TimeAxis.prototype.updateTicks = function () {
         var ticks = this.getTicks();
-        var coord, geom, obj, textgeom, textobj;
+        var coord, geom, obj, textobj;
         var i;
         for (i = 0; i < ticks.length; i++) {
             coord = this.map(ticks[i].time);
@@ -139,9 +141,8 @@ TimeAxis.prototype.updateTicks = function () {
                 obj = this.tickObjs[i];
                 obj.translateX(coord - obj.userData.coord);
                 obj.userData.coord = coord;
-                textgeom = obj.children[1].geometry;
+                this.tgp.putLabel(obj.children[1]);
                 obj.remove(obj.children[1]);
-                textgeom.dispose();
             } else {
                 geom = new THREE.Geometry();
                 geom.vertices.push(new THREE.Vector3(-this.THICKNESS, this.TICKLENGTH, this.AXISZ),
@@ -156,17 +157,14 @@ TimeAxis.prototype.updateTicks = function () {
                 obj.translateX(coord);
                 obj.userData.coord = coord;
             }
-            textgeom = new THREE.TextGeometry(ticks[i].getLabel(this.translator), {size: this.TICKLABELSIZE, height: this.AXISZ});
-            textobj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
-            textobj.translateX(this.THICKNESS * 2);
-            textobj.translateY(this.THICKNESS * 2);
+            textobj = this.tgp.getLabel(ticks[i].getLabel(this.translator));
             obj.add(textobj);
         }
         for (var j = this.tickObjs.length - 1; j >= i; j--) {
             obj = this.tickObjs.pop();
             this.obj.remove(obj);
             obj.children[0].geometry.dispose();
-            //obj.children[1].geometry.dispose();
+            this.tgp.putLabel(obj.children[1]);
         }
         
     };
@@ -289,7 +287,57 @@ TimeAxis.prototype.getTickDelta = function (intervals, span) {
         return intervals[tickIndex];
     };
     
-/* Logically representation of a tick. */
+function TickGeomPool() {
+    this.labelMap = {};
+    this.request = 0;
+}
+
+TickGeomPool.prototype.TICKLABELSIZE = TimeAxis.prototype.TICKLABELSIZE;
+TickGeomPool.prototype.AXISZ = TimeAxis.prototype.AXISZ;
+TickGeomPool.prototype.THICKNESS = TimeAxis.prototype.THICKNESS;
+TickGeomPool.prototype.PRUNEPERIOD = 1000;
+
+TickGeomPool.prototype.getLabel = function (label) {
+        var arr;
+        if (this.labelMap.hasOwnProperty(label)) {
+            arr = this.labelMap[label];
+        } else {
+            arr = [];
+            this.labelMap[label] = arr;
+        }
+        if (arr.length > 0) {
+            return this.labelMap[label].pop();
+        } else {
+            var textgeom = new THREE.TextGeometry(label, {size: this.TICKLABELSIZE, height: this.AXISZ});
+            var textobj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
+            textobj.translateX(this.THICKNESS * 2);
+            textobj.translateY(this.THICKNESS * 2);
+            textobj.userData.label = label;
+            return textobj;
+        }
+    };
+    
+TickGeomPool.prototype.putLabel = function (labelObj) {
+        this.labelMap[labelObj.userData.label].push(labelObj);
+        if (++this.request == this.PRUNEPERIOD) {
+            this.request = 0;
+            this.pruneCache();
+        }
+    };
+    
+TickGeomPool.prototype.pruneCache = function () {
+        for (var label in this.labelMap) {
+            if (this.labelMap.hasOwnProperty(label)) {
+                var objs = this.labelMap[label];
+                for (var i = 0; i < objs.length; i++) {
+                    objs[i].geometry.dispose();
+                }
+                this.labelMap[label] = [];
+            }
+        }
+    };
+    
+/* Logically represents a tick. */
 function Tick(time, date, granularity) {
         this.time = time;
         this.date = date;

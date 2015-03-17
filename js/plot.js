@@ -292,12 +292,12 @@ Plot.prototype.setWVPlot = function (y, topGap) {
 /** Just draw the same data again with the new x-axis. In other words, we just
     read the first level of cache and draw that same data on the new axis. */
 Plot.prototype.quickUpdate = function () {
-        // Normally, I'd update the x-axis ticks here. But I'll implement that later
         this.xAxis.updateTicks();
         this.drawGraph3();
     };
     
 Plot.prototype.quickUpdateSummary = function () {
+        this.summaryXAxis.updateTicks();
         this.drawSummary3();
     };
     
@@ -510,8 +510,10 @@ Plot.prototype.plotData = function () {
         this.endTime = this.plotter.selectedEndTime.slice(0, 2);
         this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x, this.plotbgGeom.vertices[4].y, this.plotter.translator);
         this.xAxis.addToPlotter(this.plotter);
+        this.xAxis.updateTicks();
         this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x, this.plotbgGeom.vertices[15].y, this.plotter.translator);
         this.summaryXAxis.addToPlotter(this.plotter);
+        this.summaryXAxis.updateTicks();
         
         var self = this;
         this.fullUpdate(function () {
@@ -869,10 +871,8 @@ Plot.prototype.dragPlot = function (deltaX, deltaY) {
     
 Plot.prototype.scrollPlot = function (amount) {
         amount = Math.max(Math.min(amount, 100), -100);
-        console.log(amount);
         var currRange = subTimes(this.xAxis.domainHi.slice(0, 2), this.xAxis.domainLo);
         mulTime(currRange, amount / 1000);
-        console.log(currRange);
         addTimes(this.xAxis.domainLo, currRange);
         subTimes(this.xAxis.domainHi, currRange);
         // Update the screen

@@ -230,10 +230,10 @@ TimeAxis.prototype.getTicks = function () {
             }
             break;
         case "year":
-            curryear = firstdate.getUTCFullYear();
+            curryear = Math.ceil((firstdate.getUTCFullYear() + 1) / deltatick) * deltatick;
             date = new Date(curryear, 0);
-            if (this.domainLo[0] == date.getTime()) { // in case the low range of the domain falls exactly on a year boundary
-                curryear++;
+            if (this.domainLo[0] == date.getTime() && this.domainLo[1] > 0) { // in case the low range of the domain falls exactly on a year boundary
+                curryear += deltatick;
                 date = new Date(curryear, 0);
             }
             while (date.getTime() <= this.domainHi[0]) {
@@ -243,11 +243,12 @@ TimeAxis.prototype.getTicks = function () {
             }
             break;
         case "month":
-            curryear = firstdate.getUTCFullYear();
-            currmonth = firstdate.getUTCMonth();
+            currmonth = Math.ceil((firstdate.getUTCMonth() + 1) / deltatick) * deltatick;
+            curryear = firstdate.getUTCFullYear() + Math.floor(currmonth / 12);
+            currmonth %= 12;
             date = new Date(curryear, currmonth);
-            if (this.domainLo[0] == date.getTime()) { // in case the low range of the domain falls exactly on a month boundary
-                currmonth++;
+            if (this.domainLo[0] == date.getTime() && this.domainLo[1] > 0) { // in case the low range of the domain falls exactly on a month boundary
+                currmonth += deltatick;
                 if (currmonth == 12) {
                     currmonth = 0;
                     curryear++;
@@ -265,7 +266,7 @@ TimeAxis.prototype.getTicks = function () {
             }
             break;
         default:
-            starttime = Math.ceil(this.domainLo[0] / deltatick) * deltatick;
+            starttime = Math.ceil((this.domainLo[0] + (this.domainLo[1] != 0)) / deltatick) * deltatick;
             date = new Date(starttime);
             while (starttime <= this.domainHi[0]) {
                 ticks.push(new Tick([date.getTime(), 0], date, granularity));

@@ -1,4 +1,4 @@
-function Axis (domainLo, domainHi, rangeLo, rangeHi) {
+function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
     this.domainLo = domainLo;
     this.domainHi = domainHi;
     
@@ -8,6 +8,22 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi) {
     if (rangeHi != undefined) {
         this.rangeHi = rangeHi;
     }
+    
+    // The actual object that will be drawn
+    this.x = x;
+    this.geom = new THREE.Geometry();
+    this.geom.vertices.push(new THREE.Vector3(this.THICKNESS, rangeLo, this.AXISZ),
+        new THREE.Vector3(this.THICKNESS, rangeHi, this.AXISZ),
+        new THREE.Vector3(-this.THICKNESS, rangeHi, this.AXISZ),
+        new THREE.Vector3(-this.THICKNESS, rangeLo, this.AXISZ));
+    this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    var material = new THREE.MeshBasicMaterial({color: 0x000000});
+    baseline = new THREE.Mesh(this.geom, material);
+    this.obj = new THREE.Object3D();
+    this.obj.add(baseline);
+    this.obj.translateX(x);
+    
+    this.tickObjs = [];
 }
 
 Axis.prototype.rangeLo = 0;
@@ -15,6 +31,11 @@ Axis.prototype.rangeHi = 1;
 
 Axis.prototype.THICKNESS = 0.1;
 Axis.prototype.AXISZ = 0.01;
+
+Axis.prototype.MINTICKS = 4;
+Axis.prototype.MAXTICKS = 8;
+
+Axis.prototype.tgp = new TickGeomPool(100); // Prune more often to conserve memory
 
 Axis.prototype.map = function (x) {
         return this.rangeLo + ((x - this.domainLo) / (this.domainHi - this.domainLo)) * (this.rangeHi - this.rangeLo);
@@ -32,6 +53,101 @@ Axis.prototype.setDomain = function (domainLo, domainHi) {
 Axis.prototype.setRange = function (rangeLo, rangeHi) {
         this.rangeLo = rangeLo;
         this.rangeHi = rangeHi;
+        
+        // Update the actual object
+        this.geom.vertices[0].y = rangeLo;
+        this.geom.vertices[1].y = rangeHi;
+        this.geom.vertices[2].y = rangeHi;
+        this.geom.vertices[3].y = rangeLo;
+        this.geom.verticesNeedUpdate = true;
+    };
+    
+Axis.prototype.addToPlotter = function (plotter) {
+        plotter.add(this.obj);
+    };
+    
+Axis.prototype.removeFromPlotter = function (plotter) {
+        plotter.remove(this.obj);
+    };
+    
+Axis.prototype.updateTicks = function () {
+        var ticks = this.getTicks();
+        var coord, geom, obj, textobj;
+        var i;
+        for (i = 0; i < ticks.length; i++) {
+            coord = this.map(ticks[i].time);
+            if (i < this.tickObjs.length) {
+                obj = this.tickObjs[i];
+                obj.translateY(coord - obj.userData.coord);
+                obj.userData.coord = coord;
+                this.tgp.putLabel(obj.children[1]);
+                obj.remove(obj.children[1]);
+            } else {
+                geom = new THREE.Geometry();
+                geom.vertices.push(new THREE.Vector3(this.TICKLENGTH, this.THICKNESS, this.AXISZ),
+                    new THREE.Vector3(0, this.THICKNESS, this.AXISZ),
+                    new THREE.Vector3(0, -this.THICKNESS, this.AXISZ),
+                    new THREE.Vector3(this.TICKLENGTH, -this.THICKNESS, this.AXISZ));
+                geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+                obj = new THREE.Object3D();
+                obj.add(new THREE.Mesh(geom, new THREE.MeshBasicMaterial({color: 0x000000})));
+                this.tickObjs.push(obj);
+                this.obj.add(obj);
+                obj.translateY(coord);
+                obj.userData.coord = coord;
+            }
+            textobj = this.tgp.getLabel(ticks[i].getLabel(this.translator));
+            obj.add(textobj);
+        }
+        for (var j = this.tickObjs.length - 1; j >= i; j--) {
+            obj = this.tickObjs.pop();
+            this.obj.remove(obj);
+            obj.children[0].geometry.dispose();
+            this.tgp.putLabel(obj.children[1]);
+        }
+    };
+    
+/** Returns an array of tick values. Don't pass this method any arguments if called externally. */
+Axis.prototype.getTicks = function () {
+        var precision = Math.round(Math.log(this.domainHi - this.domainLo) /  Math.LN10 - 1);
+        var delta = Math.pow(10, precision);
+        
+        var numTicks = (this.domainHi - this.domainLo) / delta;
+        if (numTicks > this.MAXTICKS) {
+            delta /= 2;
+        } else if (numTicks < this.MINTICKS) {
+            delta *= 2;
+        }
+        
+        var low = Math.ceil(this.domainLo / delta) * delta;
+        var ticks = [];
+        
+        precision = -precision;
+        while (low < this.domainHi) {
+            ticks.push(low.toFixed(precision));
+            low += delta;
+        }
+        
+        return ticks;
+    };
+    
+/** Widens the domain so that it starts and ends on round numbers. */
+Axis.prototype.niceDomain = function () {
+        var precision = Math.round(Math.log(this.domainHi - this.domainLo) /  Math.LN10 - 1);
+        var delta = Math.pow(10, precision);
+        
+        this.domainLo = Math.floor(this.domainLo / delta) * delta;
+        this.domainHi = Math.ceil(this.domainHi / delta) * delta;
+    };
+    
+/** Frees memory associated with this axis. */
+Axis.prototype.dispose = function () {
+        var obj;
+        for (var i = 0; i < this.tickObjs.length; i++) {
+            var obj = this.tickObjs[i];
+            obj.children[0].geometry.dispose();
+            this.tgp.put(obj.children[1]);
+        }
     };
     
 var MILLISECOND = 1;
@@ -64,8 +180,6 @@ function TimeAxis (domainLo, domainHi, rangeLo, rangeHi, y, translator) {
     
     this.tickObjs = []; // an array of objects that physically represent the ticks
     this.translator = translator;
-    
-    this.tgp = new TickGeomPool();
 }
 
 TimeAxis.prototype.THICKNESS = 0.25; // really half the thickness
@@ -90,6 +204,8 @@ TimeAxis.prototype.MAXMONTHTICK = 6;
 
 TimeAxis.prototype.TICKLENGTH = 2; // the length of each tick in virtual coordinates
 TimeAxis.prototype.TICKLABELSIZE = 3;
+
+TimeAxis.prototype.tgp = new TickGeomPool(1000); // prune less often for better performance
 
 TimeAxis.prototype.map = function (x) {
         var time = x.slice(0);
@@ -166,7 +282,6 @@ TimeAxis.prototype.updateTicks = function () {
             obj.children[0].geometry.dispose();
             this.tgp.putLabel(obj.children[1]);
         }
-        
     };
     
 /* Returns a list of Ticks describing where the ticks should go. */
@@ -293,7 +408,17 @@ TimeAxis.prototype.getTickDelta = function (intervals, span) {
         return intervals[tickIndex];
     };
     
-function TickGeomPool() {
+TimeAxis.prototype.dispose = function () {
+        var obj;
+        for (var i = 0; i < this.tickObjs.length; i++) {
+            var obj = this.tickObjs[i];
+            obj.children[0].geometry.dispose();
+            this.tgp.put(obj.children[1]);
+        }
+    };
+    
+function TickGeomPool(pruneperiod) {
+    this.pruneperiod = pruneperiod || 1000;
     this.labelMap = {};
     this.request = 0;
 }
@@ -301,7 +426,6 @@ function TickGeomPool() {
 TickGeomPool.prototype.TICKLABELSIZE = TimeAxis.prototype.TICKLABELSIZE;
 TickGeomPool.prototype.AXISZ = TimeAxis.prototype.AXISZ;
 TickGeomPool.prototype.THICKNESS = TimeAxis.prototype.THICKNESS;
-TickGeomPool.prototype.PRUNEPERIOD = 1000;
 
 TickGeomPool.prototype.getLabel = function (label) {
         var arr;
@@ -325,7 +449,7 @@ TickGeomPool.prototype.getLabel = function (label) {
     
 TickGeomPool.prototype.putLabel = function (labelObj) {
         this.labelMap[labelObj.userData.label].push(labelObj);
-        if (++this.request == this.PRUNEPERIOD) {
+        if (++this.request == this.pruneperiod) {
             this.request = 0;
             this.pruneCache();
         }

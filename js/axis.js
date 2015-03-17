@@ -211,14 +211,15 @@ TimeAxis.prototype.getTicks = function () {
         
         var ticks = [];
         var curryear, currmonth;
-        var date;
+        var date, dateMillis;
         
         // Now, generate the actual ticks.
         var firstdate = new Date(this.domainLo[0]);
         switch (granularity) {
         case "nanosecond":
             starttime = this.domainLo.slice(0, 2);
-            date = new Date(this.domainLo[0]);
+            dateMillis = this.domainLo[0];
+            date = new Date(dateMillis);
             starttime[1] = Math.ceil(starttime[1] / deltatick[1]) * deltatick[1];
             if (starttime[1] >= 1000000) {
                 starttime[0] += Math.floor(starttime[1] / 1000000)
@@ -227,6 +228,10 @@ TimeAxis.prototype.getTicks = function () {
             while (cmpTimes(starttime, this.domainHi) <= 0) {
                 ticks.push(new Tick(starttime, date, granularity));
                 starttime = addTimes(starttime.slice(0, 2), deltatick);
+                if (starttime[0] > dateMillis) {
+                    dateMillis = starttime[0];
+                    date = new Date(dateMillis);
+                }
             }
             break;
         case "year":
@@ -386,7 +391,7 @@ Tick.prototype.getLabel = function (translator, granularity) {
                 break;
             }
             number = ("0" + number).substr(-2);
-            prefix = this.date.getUTCHours() + ":";
+            prefix = ((this.date.getUTCHours() - 1 % 12) + 1) + ":";
             break;
         case "second":
             number = this.date.getUTCSeconds();

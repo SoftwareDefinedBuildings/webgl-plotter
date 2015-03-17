@@ -868,9 +868,11 @@ Plot.prototype.dragPlot = function (deltaX, deltaY) {
     };
     
 Plot.prototype.scrollPlot = function (amount) {
-        amount = Math.min(amount, 100);
+        amount = Math.max(Math.min(amount, 100), -100);
+        console.log(amount);
         var currRange = subTimes(this.xAxis.domainHi.slice(0, 2), this.xAxis.domainLo);
         mulTime(currRange, amount / 1000);
+        console.log(currRange);
         addTimes(this.xAxis.domainLo, currRange);
         subTimes(this.xAxis.domainHi, currRange);
         // Update the screen

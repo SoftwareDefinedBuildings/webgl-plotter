@@ -88,8 +88,9 @@ function mulTime(time, c) {
     var fracMillis = time[0] - intMillis;
     time[0] = intMillis;
     time[1] += 1000000 * fracMillis;
-    time[0] += Math.floor(time[1] / 1000000);
-    time[1] = time[1] % 1000000;
+    intMillis = Math.floor(time[1] / 1000000);
+    time[0] += intMillis;
+    time[1] -= 1000000 * intMillis;
     return time;
 }
 

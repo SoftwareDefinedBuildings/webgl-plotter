@@ -21,7 +21,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     this.plotmargin = {left: 20, right: 20, top: 20, bottom: 20};
     this.ddplotmargin = {top: 2, bottom: 2}; // left and right are shared with plot margin, since these will always be aligned
-    this.wvplotmargin = {top: 2, bottom: 2, left: 10, right: 10}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
+    this.wvplotmargin = {top: 2, bottom: 2, left: 2, right: 2}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
     
     // draw the chart area
     this.plotbgGeom = new THREE.Geometry()
@@ -183,6 +183,8 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.currAxes = {};
 }
 
+Plot.prototype.AXISWIDTH = 5;
+
 Plot.prototype.getVirtualToRealPixelRatio = function () {
         this.recomputePixelsWideIfNecessary();
         return this.plotspVirtualWidth / this.pixelsWide;
@@ -249,12 +251,18 @@ Plot.prototype.setPlot = function (x, y, w, h) {
             this.plotbgGeom.vertices[14].y = this.y + this.outermargin + this.plotmargin.bottom - this.wvplotmargin.top;
         }
         
-        var newWVCursorHeight = this.plotmargin.bottom - this.outermargin - this.wvplotmargin.top - this.wvplotmargin.bottom;
-        this.wvcursor1.cursorLength = newWVCursorHeight;
-        this.wvcursor2.cursorLength = newWVCursorHeight;
-        this.wvcursor1.updateForLength();
-        this.wvcursor2.updateForLength();
+        if (x != undefined || w != undefined) {
+            this.xAxis.setRange(this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
+        }
         
+        if (y != undefined || h != undefined) {
+            var newWVCursorHeight = this.plotmargin.bottom - this.outermargin - this.wvplotmargin.top - this.wvplotmargin.bottom;
+            this.wvcursor1.cursorLength = newWVCursorHeight;
+            this.wvcursor2.cursorLength = newWVCursorHeight;
+            this.wvcursor1.updateForLength();
+            this.wvcursor2.updateForLength();
+        }
+                
         this.plotbgGeom.verticesNeedUpdate = true;
         this.plotspGeom.verticesNeedUpdate = true;
     };
@@ -608,7 +616,7 @@ Plot.prototype.drawSummary1 = function () {
     };
     
 Plot.prototype.drawGraph2 = function () {
-        // Normally we'd draw the y axes here. For now, I'm going to skip that.
+        // We draw the y axes here.
         var data;
         var a, i, j, k;
         var maxval;
@@ -617,6 +625,9 @@ Plot.prototype.drawGraph2 = function () {
         var axisstreams;
         var axisnode, streamnode;
         var axis, stream;
+        
+        var leftaxisnum = 0;
+        var rightaxisnum = 0;
         
         var newAxes = {};
         
@@ -650,10 +661,14 @@ Plot.prototype.drawGraph2 = function () {
                     axis.setDomain(minval, maxval);
                 }
                 axis.niceDomain();
-                axis.updateX(this.plotbgGeom.vertices[4].x);
+                axis.updateX(this.x + this.outermargin + this.wvplotmargin.left + this.AXISWIDTH * (++leftaxisnum));
                 axis.addToPlotter(this.plotter);
             }
         }
+        
+        var newX = this.AXISWIDTH * leftaxisnum + this.wvplotmargin.left;
+        var newW = this.w - newX - this.wvplotmargin.right - this.AXISWIDTH * rightaxisnum;
+        this.setPlot(newX, undefined, newW, undefined);
         
         for (var id in this.currAxes) {
             if (this.currAxes.hasOwnProperty(id) && !newAxes.hasOwnProperty(id)) {

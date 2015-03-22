@@ -249,15 +249,19 @@ TimeAxis.prototype.updateY = function (y) {
         this.y = y;
     };
     
-TimeAxis.prototype.updateRange = function (rangeLo, rangeHi) {
+TimeAxis.prototype.setRange = function (rangeLo, rangeHi) {
         this.rangeLo = rangeLo || this.rangeLo;
         this.rangeHi = rangeHi || this.rangeHi;
+        
+        // Update the actual object
         var vertices = this.geom.vertices;
         vertices[0].x = this.rangeLo;
         vertices[1].x = this.rangeLo;
         vertices[2].x = this.rangeHi;
         vertices[3].x = this.rangeHi;
         this.geom.verticesNeedUpdate = true;
+        
+        this.updateTicks();
     };
     
 TimeAxis.prototype.addToPlotter = function (plotter) {

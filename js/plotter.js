@@ -134,7 +134,7 @@ function Plotter() {
     setting.setColor(new THREE.Vector3(0, 0, 1));
     setting.select();
     
-    setting = this.settings.addStream({uuid: "221b154e-95de-11e4-bf98-0026b6df9cf2", Properties: {UnitofMeasure: 'V'}});
+    setting = this.settings.addStream({uuid: "221b154e-95de-11e4-bf98-0026b6df9cf2", Properties: {UnitofMeasure: 'N'}});
     setting.setColor(new THREE.Vector3(1, 0, 0));
 
     this.selectedStartTime = [1420553456000, 0];

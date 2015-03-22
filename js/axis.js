@@ -1,4 +1,5 @@
 function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
+    x = x || 0;
     this.domainLo = domainLo;
     this.domainHi = domainHi;
     
@@ -12,10 +13,10 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
     // The actual object that will be drawn
     this.x = x;
     this.geom = new THREE.Geometry();
-    this.geom.vertices.push(new THREE.Vector3(this.THICKNESS, rangeLo, this.AXISZ),
-        new THREE.Vector3(this.THICKNESS, rangeHi, this.AXISZ),
-        new THREE.Vector3(-this.THICKNESS, rangeHi, this.AXISZ),
-        new THREE.Vector3(-this.THICKNESS, rangeLo, this.AXISZ));
+    this.geom.vertices.push(new THREE.Vector3(this.THICKNESS, this.rangeLo, this.AXISZ),
+        new THREE.Vector3(this.THICKNESS, this.rangeHi, this.AXISZ),
+        new THREE.Vector3(-this.THICKNESS, this.rangeHi, this.AXISZ),
+        new THREE.Vector3(-this.THICKNESS, this.rangeLo, this.AXISZ));
     this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial({color: 0x000000});
     baseline = new THREE.Mesh(this.geom, material);
@@ -24,14 +25,16 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
     this.obj.translateX(x);
     
     this.tickObjs = [];
+    
+    this.plotter = undefined;
 }
 
 Axis.prototype.rangeLo = 0;
 Axis.prototype.rangeHi = 1;
 
-Axis.prototype.THICKNESS = 0.1;
+Axis.prototype.THICKNESS = 0.25;
+Axis.prototype.TICKLENGTH = 2;
 Axis.prototype.AXISZ = 0.01;
-
 Axis.prototype.MINTICKS = 4;
 Axis.prototype.MAXTICKS = 8;
 
@@ -51,23 +54,36 @@ Axis.prototype.setDomain = function (domainLo, domainHi) {
     };
     
 Axis.prototype.setRange = function (rangeLo, rangeHi) {
-        this.rangeLo = rangeLo;
-        this.rangeHi = rangeHi;
+        this.rangeLo = rangeLo || this.rangeLo;
+        this.rangeHi = rangeHi || this.rangeHi;
         
         // Update the actual object
-        this.geom.vertices[0].y = rangeLo;
-        this.geom.vertices[1].y = rangeHi;
-        this.geom.vertices[2].y = rangeHi;
-        this.geom.vertices[3].y = rangeLo;
+        this.geom.vertices[0].y = this.rangeLo;
+        this.geom.vertices[1].y = this.rangeHi;
+        this.geom.vertices[2].y = this.rangeHi;
+        this.geom.vertices[3].y = this.rangeLo;
         this.geom.verticesNeedUpdate = true;
     };
     
 Axis.prototype.addToPlotter = function (plotter) {
-        plotter.add(this.obj);
+        if (this.plotter == undefined) {
+            plotter.scene.add(this.obj);
+            this.plotter = plotter;
+        }
+    };
+    
+Axis.prototype.removeFromPlotter = function () {
+        this.plotter.scene.remove(this.obj);
+        this.plotter = undefined;
+    };
+    
+Axis.prototype.updateX = function (x) {
+        this.obj.translateX(x - this.x);
+        this.x = x;
     };
     
 Axis.prototype.removeFromPlotter = function (plotter) {
-        plotter.remove(this.obj);
+        plotter.scene.remove(this.obj);
     };
     
 Axis.prototype.updateTicks = function () {
@@ -75,7 +91,7 @@ Axis.prototype.updateTicks = function () {
         var coord, geom, obj, textobj;
         var i;
         for (i = 0; i < ticks.length; i++) {
-            coord = this.map(ticks[i].time);
+            coord = this.map(ticks[i][0]);
             if (i < this.tickObjs.length) {
                 obj = this.tickObjs[i];
                 obj.translateY(coord - obj.userData.coord);
@@ -96,7 +112,7 @@ Axis.prototype.updateTicks = function () {
                 obj.translateY(coord);
                 obj.userData.coord = coord;
             }
-            textobj = this.tgp.getLabel(ticks[i].getLabel(this.translator));
+            textobj = this.tgp.getLabel(ticks[i][1]);
             obj.add(textobj);
         }
         for (var j = this.tickObjs.length - 1; j >= i; j--) {
@@ -114,9 +130,10 @@ Axis.prototype.getTicks = function () {
         
         var numTicks = (this.domainHi - this.domainLo) / delta;
         if (numTicks > this.MAXTICKS) {
-            delta /= 2;
-        } else if (numTicks < this.MINTICKS) {
             delta *= 2;
+        } else if (numTicks < this.MINTICKS) {
+            delta /= 2;
+            precsion += 1;
         }
         
         var low = Math.ceil(this.domainLo / delta) * delta;
@@ -124,7 +141,7 @@ Axis.prototype.getTicks = function () {
         
         precision = -precision;
         while (low < this.domainHi) {
-            ticks.push(low.toFixed(precision));
+            ticks.push([low, low.toFixed(precision)]);
             low += delta;
         }
         

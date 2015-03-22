@@ -499,8 +499,14 @@ Plot.prototype.cacheDataInAdvance = function (uuid, drawID, pwe, startTime, endT
     };
     
 Plot.prototype.updateDefaultAxisRange = function () {
-        Axis.prototype.rangeLo = this.plotbgGeom.vertices[4].y;
-        Axis.prototype.rangeHi = this.plotbgGeom.vertices[7].y;
+        var rangeLo = this.plotbgGeom.vertices[4].y;
+        var rangeHi = this.plotbgGeom.vertices[7].y;
+        var axis;
+        for (var axisid in this.plotter.settings.axisMap) {
+            axis = this.plotter.settings.axisMap[axisid].elem;
+            axis.setRange(rangeLo, rangeHi);
+            axis.updateTicks();
+        }
     };
     
 /* Eventually, this will replace drawGraph1 and drawSummary1. */
@@ -608,6 +614,7 @@ Plot.prototype.drawGraph2 = function () {
         var axisstreams;
         var axisnode, streamnode;
         var axis, stream;
+        
         for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
             axis = axisnode.elem;
             if (axis.autoscale) {
@@ -635,6 +642,9 @@ Plot.prototype.drawGraph2 = function () {
                     } else {
                         axis.setDomain(minval, maxval);
                     }
+                    axis.niceDomain();
+                    axis.updateX(this.plotbgGeom.vertices[4].x);
+                    axis.addToPlotter(this.plotter);
                 }
             }
         }

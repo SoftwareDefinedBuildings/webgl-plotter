@@ -56,7 +56,7 @@ function Settings() {
     this.streamMap = {}; // maps UUID of a stream to an object containing its metadata
     this.settingMap = {}; // maps UUID of a stream to an object containing its settings
     this.axes = new LinkedList(); // a list of axes
-    this.axisMap = {}; // maps the id of an axis to the axis object
+    this.axisMap = {}; // maps the id of an axis to the node in the linked list containing the axis object
     this.axisID = 0;
 }
 

@@ -178,6 +178,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     // cursors for the summary plot
     this.summary1 = null;
     this.summary2 = null;
+    
+    // the axes currently being drawn
+    this.currAxes = {};
 }
 
 Plot.prototype.getVirtualToRealPixelRatio = function () {
@@ -615,13 +618,15 @@ Plot.prototype.drawGraph2 = function () {
         var axisnode, streamnode;
         var axis, stream;
         
+        var newAxes = {};
+        
         for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
             axis = axisnode.elem;
+            maxval = -Infinity;
+            minval = Infinity;
             if (axis.autoscale) {
                 for (streamnode = axis.streams.head; streamnode != null; streamnode = streamnode.next) {
                     stream = streamnode.elem;
-                    maxval = -Infinity;
-                    minval = Infinity;
                     if (this.drawingCache.hasOwnProperty(stream.uuid)) {
                         data  = this.drawingCache[stream.uuid].cached_data;
                         for (k = 0; k < data.length; k++) {
@@ -635,19 +640,28 @@ Plot.prototype.drawGraph2 = function () {
                             }
                         }
                     }
-                    if (maxval < minval) {
-                        axis.setDomain(-10, 10);
-                    } else if (maxval == minval) {
-                        axis.setDomain(minval - 1, maxval + 1);
-                    } else {
-                        axis.setDomain(minval, maxval);
-                    }
-                    axis.niceDomain();
-                    axis.updateX(this.plotbgGeom.vertices[4].x);
-                    axis.addToPlotter(this.plotter);
                 }
+                newAxes[axis.axisid] = axis;
+                if (maxval < minval) {
+                    axis.setDomain(-10, 10);
+                } else if (maxval == minval) {
+                    axis.setDomain(minval - 1, maxval + 1);
+                } else {
+                    axis.setDomain(minval, maxval);
+                }
+                axis.niceDomain();
+                axis.updateX(this.plotbgGeom.vertices[4].x);
+                axis.addToPlotter(this.plotter);
             }
         }
+        
+        for (var id in this.currAxes) {
+            if (this.currAxes.hasOwnProperty(id) && !newAxes.hasOwnProperty(id)) {
+                this.currAxes[id].removeFromPlotter(this.plotter);
+            }
+        }
+        
+        this.currAxes = newAxes;
         
         this.updateDefaultAxisRange();
         

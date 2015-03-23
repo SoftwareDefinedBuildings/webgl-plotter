@@ -32,6 +32,14 @@ function Plotter() {
     boxes[1].setTarget(boxes[2]);
     boxes[2].setTarget(boxes[1]);
     
+    var plotButton = new Button(10, 10, 0, 0xff0000, this);
+    plotButton.addToObject(this.scene);
+    plotButton.setPosition(-5, -45);
+    plotButton.setClickAction(function () { self.plot.plotData(); });
+    plotButton.setPressAction(function () { plotButton.setColor(0x0000ff); });
+    plotButton.setReleaseAction(function () { plotButton.setColor(0xff0000); });
+    this.plotButton = plotButton;
+    
     // Support for the clickable interface
     $(this.canvas).click(function (event) {
             var ray = self.getMouseRay(event);
@@ -45,6 +53,7 @@ function Plotter() {
         
     // Support for the draggable interface
     self.dragging = null; // the object that we're currently dragging
+    self.pressed = null; // the object that's currently pressed
     $(this.canvas).mousedown(function (event) {
             if (self.dragging !== null) {
                 self.dragging.stopDrag();
@@ -57,6 +66,12 @@ function Plotter() {
             if (intersections.length > 0) {
                 self.dragging = intersections[0].object;
                 intersections[0].object.startDrag(intersections[0].point);
+            } else {
+                intersections = ray.intersectObjects(self.clickables);
+                if (intersections.length > 0) {
+                    self.pressed = intersections[0].object;
+                    intersections[0].object.press();
+                }
             }
         });
         
@@ -64,6 +79,9 @@ function Plotter() {
             if (self.dragging !== null) {
                 self.dragging.stopDrag();
                 self.dragging = null;
+            } else if (self.pressed !== null) {
+                self.pressed.release();
+                self.pressed = null;
             }
         });
         

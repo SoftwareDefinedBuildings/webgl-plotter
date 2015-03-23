@@ -8,6 +8,8 @@ function ColorBox(width, height, centerX, centerY, centerZ) { // implements Clic
     var material = new THREE.MeshBasicMaterial({color: 0x00ffff});
     this.obj = new THREE.Mesh(geom, material);
     this.obj.click = this.click.bind(this); // an extra parameter I'm adding
+    this.obj.press = function () {};
+    this.obj.release = function () {};
     this.target = null;
     this.selected = false;
 }

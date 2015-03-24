@@ -32,9 +32,10 @@ function Plotter() {
     boxes[1].setTarget(boxes[2]);
     boxes[2].setTarget(boxes[1]);
     
-    var plotButton = new Button(10, 10, 0, 0xff0000, this);
+    var plotButton = new Button(25, 10, 0, 0xff0000, this);
     plotButton.addToObject(this.scene);
     plotButton.setPosition(-5, -45);
+    plotButton.setText("Plot", 7, 0x00ff00);
     plotButton.setClickAction(function () { self.plot.plotData(); });
     plotButton.setPressAction(function () { plotButton.setColor(0x0000ff); });
     plotButton.setReleaseAction(function () { plotButton.setColor(0xff0000); });

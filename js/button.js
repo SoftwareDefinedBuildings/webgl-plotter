@@ -2,14 +2,16 @@
 
 function Button(width, height, z, color, plotter) { // implements Clickable
     this.z = z;
-    var geom = new THREE.Geometry();
-    geom.vertices.push(new THREE.Vector3(0, 0, z),
+    this.width = width;
+    this.height = height;
+    this.geom = new THREE.Geometry();
+    this.geom.vertices.push(new THREE.Vector3(0, 0, z),
         new THREE.Vector3(width, 0, z),
         new THREE.Vector3(width, height, z),
         new THREE.Vector3(0, height, z));
-    geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     this.material = new THREE.MeshBasicMaterial({"color": color});
-    this.obj = new THREE.Mesh(geom, this.material);
+    this.obj = new THREE.Mesh(this.geom, this.material);
     
     this.clickCB = function () {};
     this.pressCB = function () {};
@@ -23,6 +25,8 @@ function Button(width, height, z, color, plotter) { // implements Clickable
     plotter.clickables.push(this.obj);
 }
 
+Button.prototype.TEXTTHICKNESS = 0.01;
+
 /* This is a more idiomatic way of doing something that I'll need to do very often. */
 Button.prototype.addToObject = function (parent) {
         parent.add(this.obj);
@@ -34,6 +38,19 @@ Button.prototype.setPosition = function (x, y, z) {
     
 Button.prototype.setColor = function (newColor) {
         this.material.color.setHex(newColor);
+    };
+    
+Button.prototype.setText = function (text, size, color) {
+        if (this.textgeom !== undefined) {
+            this.obj.remove(this.text);
+            this.text.dispose();
+        }
+        this.textgeom = new THREE.TextGeometry(text, {"height": this.TEXTTHICKNESS, "size": size});
+        this.text = new THREE.Mesh(this.textgeom, new THREE.MeshBasicMaterial({"color": color}));
+        this.textgeom.computeBoundingBox();
+        var bbox = this.textgeom.boundingBox;
+        this.text.position.set((this.width - Math.abs(bbox.max.x - bbox.min.x)) / 2, (this.height - Math.abs(bbox.max.y - bbox.min.y)) / 2, this.z);
+        this.obj.add(this.text);
     };
 
 Button.prototype.setClickAction = function (action) {
@@ -58,4 +75,11 @@ Button.prototype.press = function () {
 
 Button.prototype.release = function () {
         this.releaseCB();
+    };
+    
+Button.prototype.dispose = function () {
+        this.geom.dispose();
+        if (this.textgeom !== undefined) {
+            this.texgeom.dispose();
+        }
     };

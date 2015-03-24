@@ -41,7 +41,7 @@ function Requester(tagsURL, dataURL) {
     this.dataURL = dataURL;
     this.connections = [];
     for (var i = 0; i < 8; i++) {
-        this.connections.push(new DataConn("wss://192.168.1.16:8080/dataws"))
+        this.connections.push(new DataConn("wss://localhost:8080/dataws"))
     }
     this.currConnection = 0;
 }
@@ -67,7 +67,7 @@ Requester.prototype.makeDataRequest = function (request, success_callback, type,
         } else {
             return $.ajax({
                     type: "POST",
-                    url: 'https://192.168.1.16:8080/data',
+                    url: 'https://localhost:8080/data',
                     data: request_str,
                     success: success_callback,
                     dataType: type,

@@ -13,8 +13,10 @@ function DataConn(url) {
     this.ws.onmessage = function (response) {
             response = response.data;
             if (self.currResponse === null) {
+                console.log("got response")
                 self.currResponse = response;
             } else {
+            	console.log("got id")
                 var callback = self.openMessages[response];
                 delete self.openMessages[response];
                 var response = self.currResponse;
@@ -36,20 +38,28 @@ DataConn.prototype.send = function(message, callback) {
     }
 }
 
-function Requester(tagsURL, dataURL) {
-    this.tagsURL = tagsURL;
-    this.dataURL = dataURL;
-    this.connections = [];
-    for (var i = 0; i < 8; i++) {
-        this.connections.push(new DataConn("wss://localhost:8080/dataws"))
+function Requester(backend) {
+    this.backend = backend;
+    this.dconnections = [];
+    var i;
+    for (i = 0; i < this.DATA_CONN; i++) {
+        this.dconnections.push(new DataConn("wss://" + backend + "/dataws"));
     }
-    this.currConnection = 0;
+    this.bconnections = [];
+    for (i = 0; i < this.BRACK_CONN; i++) {
+    	this.bconnections.push(new DataConn("wss://" + backend + "/bracketws"));
+    }
+    this.currDConnection = 0;
+    this.currBConnection = 0;
 }
+
+Requester.prototype.DATA_CONN = 8;
+Requester.prototype.BRACK_CONN = 2;
 
 Requester.prototype.makeTagsRequest = function (message, success_callback, type, error_callback) {
         return $.ajax({
                 type: "POST",
-                url: 'https://192.168.1.16:7856',
+                url: 'https://localhost:7856',
                 data: 'SENDPOST ' + this.tagsURL + ' ' + message,
                 success: success_callback,
                 dataType: type,
@@ -60,14 +70,14 @@ Requester.prototype.makeTagsRequest = function (message, success_callback, type,
 Requester.prototype.makeDataRequest = function (request, success_callback, type, error_callback) {
 		var request_str = request.join(',');
 		if (USE_WEBSOCKETS) {
-		    this.connections[this.currConnection++].send(request_str, success_callback);
-		    if (this.currConnection == 8) {
-		        this.currConnection = 0;
+		    this.dconnections[this.currDConnection++].send(request_str, success_callback);
+		    if (this.currDConnection == this.DATA_CONN) {
+		        this.currDConnection = 0;
 		    }
         } else {
             return $.ajax({
                     type: "POST",
-                    url: 'https://localhost:8080/data',
+                    url: "https://" + this.backend + "/data",
                     data: request_str,
                     success: success_callback,
                     dataType: type,
@@ -75,3 +85,28 @@ Requester.prototype.makeDataRequest = function (request, success_callback, type,
                 });
         }
     };
+    
+/** REQUEST should be an array of UUIDs whose brackets we want. */
+Requester.prototype.makeBracketRequest = function (request, success_callback, type, error_callback) {
+		var request_str = request.join(',');
+		if (USE_WEBSOCKETS) {
+		    if (!this.bconnections[this.currBConnection].ready) {
+		    	var self = this;
+		    	setTimeout(function () { self.makeBracketRequest(request, success_callback, type, error_callback); }, 1000);
+		    	return;
+		    }
+		    this.bconnections[this.currBConnection++].send(request_str, success_callback);
+		    if (this.currBConnection == this.BRACK_CONN) {
+		        this.currBConnection = 0;
+		    }
+        } else {
+            return $.ajax({
+                    type: "POST",
+                    url: "https://" + this.backend + "/bracket",
+                    data: request_str,
+                    success: success_callback,
+                    dataType: type,
+                    error: error_callback == undefined ? function () {} : error_callback
+                });
+        }
+	};

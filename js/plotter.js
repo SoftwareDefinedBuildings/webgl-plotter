@@ -126,7 +126,7 @@ function Plotter() {
     
     // all requests for external resources are done through the Requester
     //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
-	this.requester = new Requester('http://localhost:4523/', 'http://localhost:9000/data/uuid/');
+	this.requester = new Requester('localhost:8080');
         
     this.plot = new Plot(this, 0, 0.5, -100, 0);
     

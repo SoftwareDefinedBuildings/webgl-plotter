@@ -20,7 +20,23 @@ import (
 	uuid "code.google.com/p/go-uuid/uuid"
 )
 
+const (
+	QUASAR_LOW int64 = 1 - (16 << 56)
+	QUASAR_HIGH int64 = (48 << 56) - 1
+	INVALID_TIME int64 = -0x8000000000000000
+)
+
 var upgrader = ws.Upgrader{}
+
+func splitTime(time int64) (millis int64, nanos int32) {
+	millis = time / 1000000
+	nanos = int32(time % 1000000)
+	if nanos < 0 {
+		nanos += 1000000
+		millis++
+	}
+	return
+}
 
 type QueryMessagePart struct {
 	segment *capnp.Segment
@@ -38,6 +54,26 @@ var queryPool sync.Pool = sync.Pool{
 			segment: seg,
 			request: &req,
 			query: &query,
+		}
+	},
+}
+
+type BracketMessagePart struct {
+	segment *capnp.Segment
+	request *cpint.Request
+	bquery *cpint.CmdQueryNearestValue
+}
+
+var bracketPool sync.Pool = sync.Pool{
+	New: func () interface{} {
+		var seg *capnp.Segment = capnp.NewBuffer(nil)
+		var req cpint.Request = cpint.NewRootRequest(seg)
+		var bquery cpint.CmdQueryNearestValue = cpint.NewCmdQueryNearestValue(seg)
+		bquery.SetVersion(0)
+		return BracketMessagePart{
+			segment: seg,
+			request: &req,
+			bquery: &bquery,
 		}
 	},
 }
@@ -84,14 +120,16 @@ type DataRequester struct {
 	pendingLock *sync.Mutex
 	responseWriters map[uint64]Writable
 	synchronizers map[uint64]chan bool
+	boundaries map[uint64]int64
 	alive bool
 }
 
 /** Creates a new DataRequester object.
     dbAddr - the address of the database from where to obtain data.
     numConnections - the number of connections to use.
-    maxPending - a limit on the maximum number of pending requests. */
-func NewDataRequester(dbAddr string, numConnections int, maxPending uint32) *DataRequester {
+    maxPending - a limit on the maximum number of pending requests.
+    bracket - whether or not the new DataRequester will be used for bracket calls. */
+func NewDataRequester(dbAddr string, numConnections int, maxPending uint32, bracket bool) *DataRequester {
 	var connections []net.Conn = make([]net.Conn, numConnections)
 	var locks []*sync.Mutex = make([]*sync.Mutex, numConnections)
 	var err error
@@ -115,11 +153,19 @@ func NewDataRequester(dbAddr string, numConnections int, maxPending uint32) *Dat
 		pendingLock: &sync.Mutex{},
 		responseWriters: make(map[uint64]Writable),
 		synchronizers: make(map[uint64]chan bool),
+		boundaries: make(map[uint64]int64),
 		alive: true,
 	}
 	
+	var responseHandler func(net.Conn)
+	if bracket {
+		responseHandler = dr.handleBracketResponse
+	} else {
+		responseHandler = dr.handleDataResponse
+	}
+	
 	for i = 0; i < numConnections; i++ {
-		go dr.handleDataResponse(connections[i])
+		go responseHandler(connections[i])
 	}
 	
 	return dr
@@ -148,7 +194,6 @@ func (dr *DataRequester) MakeDataRequest(uuidBytes uuid.UUID, startTime int64, e
 	query := mp.query
 	
 	query.SetUuid([]byte(uuidBytes))
-	query.SetVersion(0)
 	query.SetStartTime(startTime)
 	query.SetEndTime(endTime)
 	query.SetPointWidth(pw)
@@ -219,22 +264,174 @@ func (dr *DataRequester) handleDataResponse(connection net.Conn) {
 			w.Write([]byte("["))
 			for i := 0; i < length; i++ {
 				record := records.At(i)
-				time := record.Time()
-				millis := time / 1000000
-				nanos := time % 1000000
-				if nanos < 0 {
-					nanos += 1000000
-					millis += 1
-				}
-				switch (i) {
-				case 0:
-					w.Write([]byte(fmt.Sprintf("[%v,%v,%v,%v,%v,%v]", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
-				default:
-					w.Write([]byte(fmt.Sprintf(",[%v,%v,%v,%v,%v,%v]", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
+				millis, nanos := splitTime(record.Time())
+				if i < length - 1 {
+					w.Write([]byte(fmt.Sprintf("[%v,%v,%v,%v,%v,%v],", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
+				} else {
+				    w.Write([]byte(fmt.Sprintf("[%v,%v,%v,%v,%v,%v]]", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
 				}
 			}
+		}
 		
-			w.Write([]byte("]"))
+		dr.synchronizers[id] <- true
+	}
+}
+
+func (dr *DataRequester) MakeBracketRequest(uuids []uuid.UUID, writ Writable) {
+	for true {
+		dr.pendingLock.Lock()
+		if dr.pending < dr.maxPending {
+			dr.pending += 1
+			dr.pendingLock.Unlock()
+			break
+		} else {
+			dr.pendingLock.Unlock()
+			time.Sleep(time.Second)
+		}
+	}
+	
+	defer atomic.AddUint32(&dr.pending, 0xFFFFFFFF)
+	
+	var mp BracketMessagePart = bracketPool.Get().(BracketMessagePart)
+	
+	segment := mp.segment
+	request := mp.request
+	bquery := mp.bquery
+	
+	var numResponses int = 2 * len(uuids)
+	var responseChan chan bool = make(chan bool, numResponses)
+	
+	var idsUsed []uint64 = make([]uint64, numResponses) // Due to concurrency, we could use a non-contiguous block of IDs
+	
+	var i int
+	var id uint64
+	var cid uint32
+	var sendErr error
+	for i = 0; i < len(uuids); i++ {
+		bquery.SetUuid([]byte(uuids[i]))
+		bquery.SetTime(QUASAR_LOW)
+		bquery.SetBackward(false)
+	
+		id = atomic.AddUint64(&dr.currID, 1)
+		idsUsed[i << 1] = id
+		dr.boundaries[id] = INVALID_TIME
+	
+		request.SetEchoTag(id)
+	
+		request.SetQueryNearestValue(*bquery)
+	
+		cid = atomic.AddUint32(&dr.connID, 1) % uint32(len(dr.connections))
+	
+		dr.sendLocks[cid].Lock()
+		dr.responseWriters[id] = writ
+		dr.synchronizers[id] = responseChan
+		_, sendErr = segment.WriteTo(dr.connections[cid])
+		dr.sendLocks[cid].Unlock()
+		
+		defer delete(dr.responseWriters, id)
+		defer delete(dr.synchronizers, id)
+		defer delete(dr.boundaries, id)
+		
+		if sendErr != nil {
+			w := writ.GetWriter()
+			w.Write([]byte(fmt.Sprintf("Could not send query to database: %v", sendErr)))
+			return
+		}
+		
+		bquery.SetTime(QUASAR_HIGH)
+		bquery.SetBackward(true)
+		
+		id = atomic.AddUint64(&dr.currID, 1)
+		idsUsed[(i << 1) + 1] = id
+		dr.boundaries[id] = INVALID_TIME
+	
+		request.SetEchoTag(id)
+	
+		request.SetQueryNearestValue(*bquery)
+	
+		cid = atomic.AddUint32(&dr.connID, 1) % uint32(len(dr.connections))
+	
+		dr.sendLocks[cid].Lock()
+		dr.responseWriters[id] = writ
+		dr.synchronizers[id] = responseChan
+		_, sendErr = segment.WriteTo(dr.connections[cid])
+		dr.sendLocks[cid].Unlock()
+		
+		defer delete(dr.responseWriters, id)
+		defer delete(dr.synchronizers, id)
+		defer delete(dr.boundaries, id)
+		
+		if sendErr != nil {
+			w := writ.GetWriter()
+			w.Write([]byte(fmt.Sprintf("Could not send query to database: %v", sendErr)))
+			return
+		}
+	}
+	
+	bracketPool.Put(mp)
+	
+	for i = 0; i < numResponses; i++ {
+	    <- responseChan
+	}
+	
+	var (
+		boundary int64
+		lNanos int32
+		lMillis int64
+		rNanos int32
+		rMillis int64
+		lowest int64 = QUASAR_HIGH
+		highest int64 = QUASAR_LOW
+	)
+	w := writ.GetWriter()
+	w.Write([]byte("{"))
+	for i = 0; i < len(uuids); i++ {
+		boundary = dr.boundaries[idsUsed[i << 1]]
+		if boundary < lowest {
+			lowest = boundary
+		}
+		lMillis, lNanos = splitTime(boundary)
+		boundary = dr.boundaries[idsUsed[(i << 1) + 1]]
+		if boundary > highest {
+			highest = boundary
+		}
+		rMillis, rNanos = splitTime(boundary)
+		w.Write([]byte(fmt.Sprintf("%v:[[%v,%v],[%v,%v]],", uuids[i].String(), lMillis, lNanos, rMillis, rNanos)))
+	}
+	lMillis, lNanos = splitTime(lowest)
+	rMillis, rNanos = splitTime(highest)
+	w.Write([]byte(fmt.Sprintf("Merged:[[%v,%v],[%v,%v]]}", lMillis, lNanos, rMillis, rNanos)))
+}
+
+/** A function designed to handle QUASAR's response over Cap'n Proto.
+    You shouldn't ever have to invoke this function. It is used internally by
+    the constructor function. */
+func (dr *DataRequester) handleBracketResponse(connection net.Conn) {
+	for dr.alive {
+	    // Only one goroutine will be reading at a time, so a lock isn't needed
+		responseSegment, respErr := capnp.ReadFromStream(connection, nil)
+		
+		if respErr != nil {
+			if !dr.alive {
+				break
+			}
+			fmt.Printf("Error in receiving response: %v\n", respErr)
+			continue
+		}
+		
+		responseSeg := cpint.ReadRootResponse(responseSegment)
+		id := responseSeg.EchoTag()
+		status := responseSeg.StatusCode()
+		records := responseSeg.Records().Values()
+		
+		if status != cpint.STATUSCODE_OK {
+			fmt.Printf("Error in bracket call: database returns status code %v\n", status)
+			dr.synchronizers[id] <- false
+			continue
+		}
+		
+		if records.Len() > 0 {
+			dr.boundaries[id] = records.At(0).Time()
 		}
 		
 		dr.synchronizers[id] <- true
@@ -302,6 +499,42 @@ func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, start
 	return
 }
 
+func parseBracketRequest(request string, writ Writable, expectExtra bool) (uuids []uuid.UUID, extra string, success bool) {
+	var args []string = strings.Split(string(request), ",")
+	
+	success = false
+	var w io.Writer
+
+	var numUUIDs int
+	
+	if expectExtra {
+		numUUIDs = len(args) - 1
+		if numUUIDs < 1 {
+			w = writ.GetWriter()
+			w.Write([]byte(fmt.Sprintf("At least two arguments are required; got %v", len(args))))
+			return
+		}
+		extra = args[numUUIDs]
+	} else {
+		numUUIDs = len(args)
+	}
+	
+	uuids = make([]uuid.UUID, numUUIDs)
+	
+	for i := 0; i < numUUIDs; i++ {
+		uuids[i] = uuid.Parse(args[i])
+		if uuids[i] == nil {
+			w = writ.GetWriter()
+			w.Write([]byte(fmt.Sprintf("Received invalid UUID %v", args[i])))
+			return
+		}
+	}
+	
+	success = true
+	
+	return
+}
+
 func main() {
 	configfile, err := ioutil.ReadFile("plotter.ini")
 	if err != nil {
@@ -333,7 +566,8 @@ func main() {
 	    return
 	}
 	
-	var dr *DataRequester = NewDataRequester(dbaddr.(string), 2, 8)
+	var dr *DataRequester = NewDataRequester(dbaddr.(string), 2, 8, false)
+	var br *DataRequester = NewDataRequester(dbaddr.(string), 2, 8, true)
 	
 	http.Handle("/", http.FileServer(http.Dir(directory.(string))))
 	http.HandleFunc("/dataws", func (w http.ResponseWriter, r *http.Request) {
@@ -380,7 +614,7 @@ func main() {
 			
 			cw.Writing.Unlock()
 		}
-	});
+	})
 	http.HandleFunc("/data", func (w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			w.Write([]byte("You must send a POST request to get data."))
@@ -401,7 +635,71 @@ func main() {
 			dr.MakeDataRequest(uuidBytes, startTime, endTime, uint8(pw), wrapper)
 		}
 	})
-	
+	http.HandleFunc("/bracketws", func (w http.ResponseWriter, r *http.Request) {
+	    websocket, upgradeerr := upgrader.Upgrade(w, r, nil)
+		if upgradeerr != nil {
+			// TODO Perhaps we could redirect somehow?
+			w.Write([]byte(fmt.Sprintf("Could not upgrade HTTP connection to WebSocket: %v\n", upgradeerr)))
+			return
+		}
+		
+		cw := ConnWrapper{
+			Writing: &sync.Mutex{},
+			Conn: websocket,
+		}
+		
+		for {
+			_, payload, err := websocket.ReadMessage()
+			
+			if err != nil {
+				return // Most likely the connection was closed
+			}
+			
+			uuids, echoTag, success := parseBracketRequest(string(payload), &cw, true)
+			
+			if success {
+				br.MakeBracketRequest(uuids, &cw)
+			}
+			if cw.CurrWriter != nil {
+				cw.CurrWriter.Close()
+			}
+			
+			writer, err := websocket.NextWriter(ws.TextMessage)
+			if err != nil {
+			    fmt.Println("Could not echo tag to client")
+			}
+			
+			if cw.CurrWriter != nil {
+			    _, err = writer.Write([]byte(echoTag))
+				if err != nil {
+					fmt.Println("Could not echo tag to client")
+				}
+				writer.Close()
+			}
+			
+			cw.Writing.Unlock()
+		}
+	})
+	http.HandleFunc("/bracket", func (w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.Write([]byte("You must send a POST request to get data."))
+			return
+		}
+
+		// TODO: don't just read the whole thing in one go. Instead give up after a reasonably long limit.
+		payload, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.Write([]byte(fmt.Sprintf("Could not read received POST payload: %v", err)))
+		}
+		
+		wrapper := RespWrapper{w}
+		
+		uuids, _, success := parseBracketRequest(string(payload), wrapper, false)
+		
+		if success {
+			br.MakeBracketRequest(uuids, wrapper)
+		}
+	})
 	
 	var portStr string = fmt.Sprintf(":%v", port)
 	

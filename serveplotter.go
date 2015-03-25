@@ -396,11 +396,11 @@ func (dr *DataRequester) MakeBracketRequest(uuids []uuid.UUID, writ Writable) {
 			highest = boundary
 		}
 		rMillis, rNanos = splitTime(boundary)
-		w.Write([]byte(fmt.Sprintf("%v:[[%v,%v],[%v,%v]],", uuids[i].String(), lMillis, lNanos, rMillis, rNanos)))
+		w.Write([]byte(fmt.Sprintf("\"%v\":[[%v,%v],[%v,%v]],", uuids[i].String(), lMillis, lNanos, rMillis, rNanos)))
 	}
 	lMillis, lNanos = splitTime(lowest)
 	rMillis, rNanos = splitTime(highest)
-	w.Write([]byte(fmt.Sprintf("Merged:[[%v,%v],[%v,%v]]}", lMillis, lNanos, rMillis, rNanos)))
+	w.Write([]byte(fmt.Sprintf("\"Merged\":[[%v,%v],[%v,%v]]}", lMillis, lNanos, rMillis, rNanos)))
 }
 
 /** A function designed to handle QUASAR's response over Cap'n Proto.

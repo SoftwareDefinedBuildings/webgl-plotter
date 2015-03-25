@@ -217,6 +217,8 @@ Plot.prototype.setHeight = function (h) {
         this.wvcursor2.updateForLength();
         this.summaryXAxis.updateY(wvCursorOrth);
         
+        this.plotter.plotterUI.setY(this.y);
+        
         this.plotbgGeom.verticesNeedUpdate = true;
     };
 
@@ -522,21 +524,34 @@ Plot.prototype.updateDefaultAxisRange = function () {
     
 /* Eventually, this will replace drawGraph1 and drawSummary1. */
 Plot.prototype.plotData = function () {
-        // TODO Draw the x-axis here
         this.startTime = this.plotter.selectedStartTime.slice(0, 2);
         this.endTime = this.plotter.selectedEndTime.slice(0, 2);
-        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x, this.plotbgGeom.vertices[4].y, this.plotter.translator);
-        this.xAxis.addToPlotter(this.plotter);
+        if (this.xAxis === undefined) {
+            this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x, this.plotbgGeom.vertices[4].y, this.plotter.translator);
+            this.xAxis.addToPlotter(this.plotter);
+        } else {
+            this.xAxis.domainLo = this.startTime.slice(0);
+            this.xAxis.domainHi = this.endTime.slice(0);
+        }
         this.xAxis.updateTicks();
-        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x, this.plotbgGeom.vertices[15].y, this.plotter.translator);
-        this.summaryXAxis.addToPlotter(this.plotter);
+        if (this.summaryXAxis === undefined) {
+            this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x, this.plotbgGeom.vertices[15].y, this.plotter.translator);
+            this.summaryXAxis.addToPlotter(this.plotter);
+        } else {
+            this.summaryXAxis.domainLo = this.startTime.slice(0);
+            this.summaryXAxis.domainHi = this.endTime.slice(0);
+        }
         this.summaryXAxis.updateTicks();
         
         var self = this;
         this.fullUpdate(function () {
                 self.drawGraph2();
                 self.fullUpdate(function () {
-                        self.initWVCursors();
+                        if (self.wvcursor1 === undefined) {
+                            self.initWVCursors();
+                        } else {
+                            self.updateWVCursorsFromXAxis(true);
+                        }
                         self.drawSummary2();
                     }, true);
             }, false);

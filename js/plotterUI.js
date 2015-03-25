@@ -13,14 +13,24 @@ function PlotterUI(plotter, x, y) {
     this.y = y;
     
     // The PLOT button
-    var plotButton = new Button(25, 10, 0, 0xff0000, plotter);
+    var plotButton = new Button(40, 10, 0, 0xff0000, plotter);
     plotButton.addToObject(this.plotterUI);
     plotButton.setPosition(25, -20);
-    plotButton.setText("Plot", 7, 0x00ff00);
-    plotButton.setClickAction(function () { plotter.plot.plotData(); });
+    plotButton.setText("Plot", 5, 0x00ff00);
+    plotButton.setClickAction(function () { plotter.plotData(); });
     plotButton.setPressAction(function () { plotButton.setColor(0x0000ff); });
     plotButton.setReleaseAction(function () { plotButton.setColor(0xff0000); });
     this.plotButton = plotButton;
+    
+    // The PLOT ALL DATA button
+    var plotAllButton = new Button(40, 10, 0, 0xff0000, plotter);
+    plotAllButton.addToObject(this.plotterUI);
+    plotAllButton.setPosition(100, -20);
+    plotAllButton.setText("Plot all Data", 5, 0x00ff00);
+    plotAllButton.setClickAction(function () { plotter.plotAllData(); });
+    plotAllButton.setPressAction(function () { plotAllButton.setColor(0x0000ff); });
+    plotAllButton.setReleaseAction(function () { plotAllButton.setColor(0xff0000); });
+    this.plotAllButton = plotAllButton;
     
     this.plotterUI.position.set(x, y, 0);
     

@@ -13,10 +13,8 @@ function DataConn(url) {
     this.ws.onmessage = function (response) {
             response = response.data;
             if (self.currResponse === null) {
-                console.log("got response")
                 self.currResponse = response;
             } else {
-            	console.log("got id")
                 var callback = self.openMessages[response];
                 delete self.openMessages[response];
                 var response = self.currResponse;

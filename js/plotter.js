@@ -153,6 +153,30 @@ function Plotter() {
     this.selectedEndTime = [1421676656000, 0];
 }
 
+/** The PLOT button. */
+Plotter.prototype.plotData = function () {
+        this.plot.plotData();
+    };
+    
+Plotter.prototype.plotAllData = function () {
+        // Create a list of UUIDs
+        var uuids = [];
+        for (var uuid in this.settings.streamMap) {
+            if (this.settings.streamMap.hasOwnProperty(uuid)) {
+                uuids.push(uuid);
+            }
+        }
+        
+        var self = this;
+        // Get the brackets and draw the graph asynchronously
+        this.requester.makeBracketRequest(uuids, function (result) {
+                var times = JSON.parse(result);
+                self.selectedStartTime = times.Merged[0];
+                self.selectedEndTime = times.Merged[1];
+                self.plotData();
+            });
+    };
+
 Plotter.prototype.updateScreenSize = function () {
         this.width = 0.9 * Math.min(window.innerWidth, 10000);
         this.canvas.style.width = this.width;

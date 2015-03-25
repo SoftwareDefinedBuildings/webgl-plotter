@@ -70,6 +70,11 @@ Requester.prototype.makeTagsRequest = function (message, success_callback, type,
 Requester.prototype.makeDataRequest = function (request, success_callback, type, error_callback) {
 		var request_str = request.join(',');
 		if (USE_WEBSOCKETS) {
+			if (!this.dconnections[this.currDConnection].ready) {
+		    	var self = this;
+		    	setTimeout(function () { self.makeDataRequest(request, success_callback, type, error_callback); }, 1000);
+		    	return;
+		    }
 		    this.dconnections[this.currDConnection++].send(request_str, success_callback);
 		    if (this.currDConnection == this.DATA_CONN) {
 		        this.currDConnection = 0;

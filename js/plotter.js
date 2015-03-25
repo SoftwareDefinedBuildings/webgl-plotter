@@ -31,16 +31,7 @@ function Plotter() {
     boxes[3].setTarget(boxes[0]);
     boxes[1].setTarget(boxes[2]);
     boxes[2].setTarget(boxes[1]);
-    
-    var plotButton = new Button(25, 10, 0, 0xff0000, this);
-    plotButton.addToObject(this.scene);
-    plotButton.setPosition(-5, -45);
-    plotButton.setText("Plot", 7, 0x00ff00);
-    plotButton.setClickAction(function () { self.plot.plotData(); });
-    plotButton.setPressAction(function () { plotButton.setColor(0x0000ff); });
-    plotButton.setReleaseAction(function () { plotButton.setColor(0xff0000); });
-    this.plotButton = plotButton;
-    
+       
     // Support for the clickable interface
     $(this.canvas).click(function (event) {
             var ray = self.getMouseRay(event);
@@ -126,9 +117,11 @@ function Plotter() {
     
     // all requests for external resources are done through the Requester
     //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
-	this.requester = new Requester('192.168.1.16:8080');
+	this.requester = new Requester('localhost:8080');
         
     this.plot = new Plot(this, 0, 0.5, -100, 0);
+    
+    this.plotterUI = new PlotterUI(this, -100, 0);
     
     // draw white background behind the plot
     var bgGeom = new THREE.Geometry();
@@ -161,7 +154,7 @@ function Plotter() {
 }
 
 Plotter.prototype.updateScreenSize = function () {
-        this.width = Math.min(window.innerWidth, 1000);
+        this.width = 0.9 * Math.min(window.innerWidth, 10000);
         this.canvas.style.width = this.width;
         this.height = this.hToW * this.width;
         this.canvas.style.height = this.height;

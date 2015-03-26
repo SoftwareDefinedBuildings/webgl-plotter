@@ -3,7 +3,7 @@
     fully implemented, but some instance fields for that purpose have been
     declared and some methods implemented. */
 
-function Cache (requester) {
+function Cache(requester) {
     /* The dataCache maps UUID to an object that maps the point width exponent to
        cached data. The array contains cached entries, objects that store a start
        time, end time, and data; the cached entries never overlap, are consolidated
@@ -854,10 +854,10 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         ddplotVertexID = addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID);
         
         if (prevGap) {
-            normals[vertexID - 6] = CacheEntry.topDirMarked;
-            normals[vertexID - 5] = CacheEntry.bottomDirMarked;
-            normals[vertexID - 4] = CacheEntry.rightDirMarked;
-            normals[vertexID - 3] = CacheEntry.leftDirMarked;
+            normals[vertexID - 4] = CacheEntry.topDirMarked;
+            normals[vertexID - 3] = CacheEntry.bottomDirMarked;
+            normals[vertexID - 2] = CacheEntry.rightDirMarked;
+            normals[vertexID - 1] = CacheEntry.leftDirMarked;
         }
         graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 3, vertexID - 2));
         graph.faces.push(new THREE.Face3(vertexID - 4, vertexID - 1, vertexID - 3));

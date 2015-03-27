@@ -181,6 +181,20 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // the axes currently being drawn
     this.currAxes = {};
+    
+    // Start polling brackets
+    var self = this;
+    var pollBracketsRepeatedly = function () {
+            setTimeout(function () {
+                    self.pollBracketsIfNecessary(pollBracketsRepeatedly);
+                }, 5000);
+        };
+    pollBracketsRepeatedly();
+    
+    
+    // Store whether the "Stage 2" initialization has been completed.
+    this.initializedGraph = false;
+    this.initializedSummaryGraph = false;
 }
 
 Plot.prototype.AXISWIDTH = 5;
@@ -314,6 +328,66 @@ Plot.prototype.quickUpdateSummary = function () {
         this.drawSummary3();
     };
     
+/** Polls brackets and updates the cache and screen if necessary. FINISHED is a
+    callback function that is invoked after this process is completed. */
+Plot.prototype.pollBracketsIfNecessary = function (finished) {
+        if (this.xAxis === undefined || this.summaryXAxis === undefined) {
+            return;
+        }
+
+        var cutoff;
+        if (cmpTimes(this.xAxis.domainHi, this.summaryXAxis.domainHi) > 0) {
+            cutoff = this.xAxis.domainHi;
+        } else {
+            cutoff = this.summaryXAxis.domainHi;
+        }
+        
+        var streams = this.plotter.settings.getStreams();
+        var node, uuid;
+        
+        var streamsToPoll = [];
+        
+        for (node = streams.head; node !== null; node = node.next) {
+            uuid = node.elem.uuid;
+            if (this.dataCache.lastTimes.hasOwnProperty(uuid)) {
+                if (cmpTimes(this.dataCache.lastTimes[uuid], cutoff) < 0) {
+                    streamsToPoll.push(uuid);
+                }
+            } else {
+                streamsToPoll.push(uuid); // We need to poll the brackets for a stream if we haven't done so before
+            }
+        }
+        
+        if (streamsToPoll.length > 0) {
+            var self = this;
+            this.plotter.requester.makeBracketRequest(streamsToPoll, function (result) {
+                    var cutoff;
+                    if (cmpTimes(self.xAxis.domainHi, self.summaryXAxis.domainHi) > 0) {
+                        cutoff = self.xAxis.domainHi;
+                    } else {
+                        cutoff = self.summaryXAxis.domainHi;
+                    }
+                    if (self.dataCache.updateToBrackets(JSON.parse(result), cutoff)) {
+                        self.fullUpdate(function () {
+                                if (self.initializedSummaryGraph) {
+                                    self.drawSummary3();
+                                }
+                                self.fullUpdate(function () {
+                                        if (self.initializedGraph) {
+                                            self.drawGraph3();
+                                        }
+                                        finished();
+                                    }, false);
+                            }, true);
+                    } else {
+                        finished();
+                    }
+                });
+        } else {
+            finished();
+        }
+    };
+    
 /** Draw the graph with the new x-axis, accounting for the fact that the data
     may have changed. In other words, we search in the second level of cache
     and draw the correct data. The method is not guaranteed to call CALLBACK
@@ -361,10 +435,10 @@ Plot.prototype.fullUpdate = function (callback, summary) {
         var hiRequestTime = roundTime(axis.domainHi.slice(0, 2));
         
         if (thisRequestID % 5 == 0) {
-            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 100000, 50000);
+            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 100000, 500000);
         }
         
-        for (var streamnode = streams.head; streamnode != null; streamnode = streamnode.next) {
+        for (var streamnode = streams.head; streamnode !== null; streamnode = streamnode.next) {
             currUUID = streamnode.elem.uuid;
             this.dataCache.getData(currUUID, pwe, loRequestTime.slice(0), hiRequestTime.slice(0), (function (uuid) {
                     return function (entry) {
@@ -380,6 +454,8 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                             setTimeout(function () {
                                     self.cacheDataInAdvance(uuid, thisRequestID, pwe, loRequestTime, hiRequestTime);
                                 }, 1000);
+                            
+                            var toDispose = [];
                             
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
@@ -397,7 +473,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                         } else {
                                             cacheEntry.inPrimaryCache = false;
                                         }
-                                        cacheEntry.disposeIfPossible();
+                                        toDispose.push(cacheEntry);
                                         if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
                                             continue;
                                         }
@@ -420,7 +496,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                         } else {
                                             ce.inPrimaryCache = true;
                                         }
-                                        if (!ce.hasOwnProperty("graph")) {
+                                        if (!ce.cached_drawing.hasOwnProperty("graph")) {
                                             ce.cacheDrawing(pwe);
                                         }
                                         
@@ -457,6 +533,12 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                 }
                                 
                                 callback();
+                                
+                                //setTimeout(function () {
+                                        for (var i = 0; i < toDispose.length; i++) {
+                                            toDispose[i].disposeIfPossible();
+                                        }
+                                //    }, 20000);
                             }
                         };
                 })(currUUID), false);
@@ -544,17 +626,19 @@ Plot.prototype.plotData = function () {
         this.summaryXAxis.updateTicks();
         
         var self = this;
-        this.fullUpdate(function () {
-                self.drawGraph2();
+        this.pollBracketsIfNecessary(function () {
                 self.fullUpdate(function () {
-                        if (self.wvcursor1 === undefined) {
-                            self.initWVCursors();
-                        } else {
-                            self.updateWVCursorsFromXAxis(true);
-                        }
-                        self.drawSummary2();
-                    }, true);
-            }, false);
+                        self.drawGraph2();
+                        self.fullUpdate(function () {
+                                if (self.wvcursor1 === undefined) {
+                                    self.initWVCursors();
+                                } else {
+                                    self.updateWVCursorsFromXAxis(true);
+                                }
+                                self.drawSummary2();
+                            }, true);
+                    }, false);
+            });
     };
     
 Plot.prototype.updateWVCursorsFromXAxis = function (full) {
@@ -695,6 +779,7 @@ Plot.prototype.drawGraph2 = function () {
         
         this.updateDefaultAxisRange();
         
+        this.initializedGraph = true;
         this.drawGraph3();
     };
     
@@ -726,6 +811,7 @@ Plot.prototype.drawSummary2 = function () {
         
         this.summaryYAxis = new Axis(minval, maxval, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y);
         
+        this.initializedSummaryGraph = true;
         this.drawSummary3();
     };
     
@@ -759,7 +845,7 @@ Plot.prototype.drawGraph3 = function () {
         
         var axes = this.plotter.settings.getAxes();
         var axisnode, streamnode;
-        var axis, uuid;
+        var affineMatrix, axis, uuid;
         
         var pwe, pixelShift;
         
@@ -817,39 +903,48 @@ Plot.prototype.drawSummary3 = function () {
             this.plotter.scene.add(this.wvplot);
         }
         var cacheEntry;
-        var shaders, shader;
+        var shaders;
         
         var dispSettings;
         
         var axisnode, streamnode;
         
         var pwe, pixelShift;
-        affineMatrix = getAffineTransformMatrix(this.summaryXAxis, this.summaryYAxis);
+        var affineMatrix = getAffineTransformMatrix(this.summaryXAxis, this.summaryYAxis);
         
-        for (var uuid in this.summaryCache) {
-            if (this.summaryCache.hasOwnProperty(uuid)) {
-                cacheEntry = this.summaryCache[uuid];
-                cacheEntry.compressIfPossible();
-                
-                shaders = this.summaryShaders[uuid];
-                
-                dispSettings = this.plotter.settings.getSettings(uuid);
-                
-                if (pwe != cacheEntry.cached_drawing.pwe) {
-                    pwe = cacheEntry.cached_drawing.pwe;
-                    pixelShift = this.summaryXAxis.getPixelShift(pwe);
-                }
-                
-                if (cacheEntry.getLength() != 0) {
-                    graph = cacheEntry.cached_drawing.rangegraph;
-                    packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
-                    setMeshChild(this.wvplot, meshNum++, graph, shaders[1]);
+        var axes = this.plotter.settings.getAxes();
+        var axisnode, streamnode;
+        var axis, uuid;
+        
+        for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
+            axis = axisnode.elem;
+            for (streamnode = axis.streams.head; streamnode != null; streamnode = streamnode.next) {
+                uuid = streamnode.elem.uuid;
+                if (this.summaryCache.hasOwnProperty(uuid)) {
+                    cacheEntry = this.summaryCache[uuid];
+                    cacheEntry.compressIfPossible();
                     
-                    graph = cacheEntry.cached_drawing.graph;
-                    packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, undefined, this.rotator90)
-                    setMeshChild(this.wvplot, meshNum++, graph, shaders[0]);
-                } else {
-                    meshNum += 2;
+                    shaders = this.summaryShaders[uuid];
+                    
+                    dispSettings = this.plotter.settings.getSettings(uuid);
+                    
+                    if (pwe != cacheEntry.cached_drawing.pwe) {
+                        pwe = cacheEntry.cached_drawing.pwe;
+                        pixelShift = this.summaryXAxis.getPixelShift(pwe);
+                    }
+                    
+                    if (cacheEntry.getLength() > 0) {
+                        graph = cacheEntry.cached_drawing.rangegraph;
+                        packShaderUniforms(shaders[1], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, dispSettings.selected ? 0.6 : 0.3);
+                        setMeshChild(this.wvplot, meshNum++, graph, shaders[1]);
+                        
+                        graph = cacheEntry.cached_drawing.graph;
+                        packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, undefined, this.rotator90)
+                        setMeshChild(this.wvplot, meshNum++, graph, shaders[0]);
+                        
+                    } else {
+                        meshNum += 2;
+                    }
                 }
             }
         }

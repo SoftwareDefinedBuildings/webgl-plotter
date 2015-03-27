@@ -13,7 +13,7 @@ function Cache(requester) {
     // The total number of data points that have been cached.
     this.loadedData = 0;
     this.loadedStreams = {}; // maps a stream's uuid to the total number of points that have been cached for that stream
-    this.lastTimes = {}; // maps a stream's uuid to the time of the last pint where there is valid data, obtained from the server
+    this.lastTimes = {}; // maps a stream's uuid to the time of the last point where there is valid data, obtained from the server
     this.pollingBrackets = false; // whether or not we are periodically checking if the brackets have changed
     this.bracketInterval = 5000;
     
@@ -57,24 +57,24 @@ CacheEntry.prototype.compressIfPossible = function () {
         var graph = this.cached_drawing.graph;
         var rangegraph = this.cached_drawing.rangegraph;
         var ddplot = this.cached_drawing.ddplot;
-        if (graph.vertices.length > 0 && !graph.verticesNeedUpdate) {
-            //graph.vertices = [];
+        /*if (graph.vertices.length > 0 && !graph.verticesNeedUpdate) {
+            graph.vertices = [];
         }
         if (graph.faces.length > 0 && !graph.elementsNeedUpdate) {
-            //graph.faces = [];
+            graph.faces = [];
         }
         if (rangegraph.vertices.length > 0 && !rangegraph.verticesNeedUpdate) {
-            //rangegraph.vertices = [];
+            rangegraph.vertices = [];
         }
         if (rangegraph.faces.length > 0 && !rangegraph.elementsNeedUpdate) {
-            //rangegraph.faces = [];
+            rangegraph.faces = [];
         }
         if (ddplot.vertices.length > 0 && !ddplot.verticesNeedUpdate) {
-            //ddplot.vertices = [];
+            ddplot.vertices = [];
         }
         if (ddplot.faces.length > 0 && !ddplot.elementsNeedUpdate) {
-            //ddplot.faces = [];
-        }
+            ddplot.faces = [];
+        }*/
     };
     
 CacheEntry.prototype.freeDrawing = function () {
@@ -88,7 +88,7 @@ CacheEntry.prototype.disposeIfPossible = function () {
         if (!this.inSecondaryCache && !this.inPrimaryCache && !this.inSummaryCache) {
             if (this.cached_drawing.hasOwnProperty("graph")) {
                 this.compressIfPossible(); // help speed up garbage collection
-                this.freeDrawing();
+                //this.freeDrawing();
             }
         }
     };
@@ -167,6 +167,46 @@ function validateContiguous(cacheEntry, pwe) {
     }
 }
 
+/** Given the result of a bracket call, invalidates the part of the cache
+    between the previous end time and the new end time. This portion of the
+    cache should only contain a lack of data; that is, only the end time
+    should be trimmed on the last cache entry. BRACKETRESP is the JSON
+    object returned by the server-side code, and CURREND is what is last time
+    which is in the user's field of view. If data is removed from the cache
+    before CURREND (meaning it may affect what the user is seeing at the time
+    the function is called), the function returns true. Otherwise, it returns
+    false. */
+Cache.prototype.updateToBrackets = function (bracketResp, currEnd) {
+        var mustRefresh = false;
+        var prevTime;
+        for (var uuid in bracketResp) {
+            if (bracketResp.hasOwnProperty(uuid)) {
+                if (this.lastTimes.hasOwnProperty(uuid)) {
+                    if (this.dataCache.hasOwnProperty(uuid) && cmpTimes((prevTime = this.lastTimes[uuid]), bracketResp[uuid][1]) < 0) {
+                        this.trimCache(uuid, prevTime);
+                        this.lastTimes[uuid] = bracketResp[uuid][1];
+                        mustRefresh = mustRefresh || (cmpTimes(prevTime, currEnd) <= 0);
+                    }
+                } else {
+                    // I don't know how far back the last legitimate time was, so I'm going to throw away the whole thing to be safe
+                    this.lastTimes[uuid] = bracketResp[uuid][1];
+                    this.loadedData -= this.loadedStreams[uuid];
+                    for (pointwidth in this.dataCache[uuid]) {
+                        if (this.dataCache[uuid].hasOwnProperty(pointwidth)) {
+                            for (var i = 0; i < this.dataCache[uuid][pointwidth].length; i++) {
+                                this.dataCache[uuid][pointwidth][i].removeFromSecCache();
+                            }
+                        }
+                    }
+                    delete this.dataCache[uuid];
+                    delete this.loadedStreams[uuid];
+                    mustRefresh = true;
+                }
+            }
+        }
+        return mustRefresh;
+    };
+
 /* Ensures that the stream with the specified UUID has data cached from
    STARTTIME to ENDTIME at the point width corresponding to POINTWIDTHEXP, or
    floor(lg(POINTWIDTH)). If it does not, data are procured from the server and
@@ -179,11 +219,8 @@ function validateContiguous(cacheEntry, pwe) {
    function doesn't fall behind user input).
    
    STARTTIME and ENDTIME are aliased in the cache, so pass in a copy. If you
-   don't, editing those same variables later could make the cache invalid.
-   
-   */
+   don't, editing those same variables later could make the cache invalid. */
 Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, callback, caching) {
-        //alert("got request");
         pointwidthexp = Math.min(this.pweHigh, pointwidthexp);
         
         var queryStart = startTime;
@@ -240,7 +277,6 @@ Cache.prototype.getData = function (uuid, pointwidthexp, startTime, endTime, cal
         }
         
         var indices = getIndices(cache, startTime, endTime);
-        //alert("got indices");
         var i = indices[0];
         var j = indices[1];
         var startsBefore = indices[2];
@@ -532,7 +568,7 @@ function cmpEntryEnds(entry1, entry2) {
    LASTTIME is specified in milliseconds in Universal Coordinated Time (UTC). */
 Cache.prototype.trimCache = function (uuid, lastTime) {
         var dataCache = this.dataCache;
-        var data, datalength;
+        var data, datalength, mustTrimEntry;
         if (dataCache.hasOwnProperty(uuid)) {
             var cache = dataCache[uuid];
             for (var resolution in cache) {
@@ -541,34 +577,52 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                     if (entries.length == 0) {
                         continue;
                     }
-                    var index = binSearchCmp(entries, lastTime, cmpTimes);
-                    if (index > 0 && cmpTimes(entries[index].start_time, lastTime) > 0 && cmpTimes(entries[index - 1].end_time, lastTime) > 0) {
+                    var index = binSearchCmp(entries, {start_time: lastTime}, cmpEntryStarts);
+                    
+                    if (cmpTimes(entries[index].start_time, lastTime) > 0) {
                         index--;
                     }
-                    if (cmpTimes(entries[index].start_time, lastTime) <= 0 && (datalength = entries[index].getLength) > 0) {
+                    // All entries at an index strictly greater than index will be deleted.
+                    if (index >= 0 && cmpTimes(entries[index].end_time, lastTime) >= 0 && (datalength = entries[index].getLength()) > 0) {
                         data = entries[index].cached_data;
-                        var entryIndex = binSearchCmp(data, [lastTime], cmpFirstTimes); // Needs to be updated
-                        if (cmpFirstTimes(data[entryIndex], [lastTime]) <= 0) {
+                        var entryIndex = binSearchCmp(data, [lastTime], cmpFirstTimes);
+                        if (cmpFirstTimes(data[entryIndex], [lastTime]) <= 0 && entryIndex < data.length - 1) {
                             entryIndex++;
                         }
+                        if (data[entryIndex].length == 0) {
+                            continue;
+                        }
+                        // All chunks in the entry at an index strictly greater than entryIndex will be deleted.
                         var pointIndex = binSearchCmp(data[entryIndex], lastTime, cmpTimes);
                         if (cmpTimes(data[entryIndex][pointIndex], lastTime) <= 0) {
                             pointIndex++;
                         }
+                        // All points in the chunk greater at an index than or equal to pointIndex will be deleted.
                         entries[index].end_time = lastTime;
+                        
+                        if (pointIndex == 0 && entryIndex > 0) { // So we don't end up with an empty chunk
+                            entryIndex--;
+                            pointIndex = data[entryIndex].length;
+                        }
+                        
+                        // The only way we can end up with an empty chunk now is if this entire entry is trimmed away.
+                        
                         var numgroups = entries[index].cached_data.length - entryIndex - 1;
                         for (var i = entryIndex + 1; i < data.length; i++) {
                             this.loadedData -= data[i].length;
                         }
                         data.splice(entryIndex + 1, numgroups);
-                        var numpoints = data[entryIndex].length - pointIndex - 1;
+                        var numpoints = data[entryIndex].length - pointIndex;
                         data[entryIndex].splice(pointIndex, numpoints);
                         this.loadedData -= numpoints;
-                        index++;
+                        if (entries[index].cached_drawing.graph !== undefined) {
+                            entries[index].freeDrawing();
+                        }
                     }
-                    var excised = entries.splice(0, index);
+                    var excised = entries.splice(index + 1, entries.length);
                     for (var i = 0; i < excised.length; i++) {
                         this.loadedData -= excised[i].getLength();
+                        excised[i].removeFromSecCache();
                     }
                 }
             }

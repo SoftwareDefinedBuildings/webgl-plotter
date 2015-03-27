@@ -19,7 +19,7 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
         new THREE.Vector3(-this.THICKNESS, this.rangeLo, this.AXISZ));
     this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial({color: 0x000000});
-    baseline = new THREE.Mesh(this.geom, material);
+    var baseline = new THREE.Mesh(this.geom, material);
     this.obj = new THREE.Object3D();
     this.obj.add(baseline);
     this.obj.translateX(x);

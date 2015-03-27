@@ -88,7 +88,7 @@ CacheEntry.prototype.disposeIfPossible = function () {
         if (!this.inSecondaryCache && !this.inPrimaryCache && !this.inSummaryCache) {
             if (this.cached_drawing.hasOwnProperty("graph")) {
                 this.compressIfPossible(); // help speed up garbage collection
-                //this.freeDrawing();
+                this.freeDrawing();
             }
         }
     };
@@ -583,6 +583,15 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                         index--;
                     }
                     // All entries at an index strictly greater than index will be deleted.
+                    
+                    var excised = entries.splice(index + 1, entries.length);
+                    for (var i = 0; i < excised.length; i++) {
+                        datalength = excised[i].getLength();
+                        this.loadedData -= datalength;
+                        this.loadedStreams[uuid] -= datalength;
+                        excised[i].removeFromSecCache();
+                    }
+                    
                     if (index >= 0 && cmpTimes(entries[index].end_time, lastTime) >= 0 && (datalength = entries[index].getLength()) > 0) {
                         data = entries[index].cached_data;
                         var entryIndex = binSearchCmp(data, [lastTime], cmpFirstTimes);
@@ -618,11 +627,6 @@ Cache.prototype.trimCache = function (uuid, lastTime) {
                         if (entries[index].cached_drawing.graph !== undefined) {
                             entries[index].freeDrawing();
                         }
-                    }
-                    var excised = entries.splice(index + 1, entries.length);
-                    for (var i = 0; i < excised.length; i++) {
-                        this.loadedData -= excised[i].getLength();
-                        excised[i].removeFromSecCache();
                     }
                 }
             }
@@ -774,6 +778,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         var ddplotVertex;
         var range1, range2;
         var timeNanos = [];
+        var normal;
         var normals = [];
         var rangeTimeNanos = [];
         var rangePerturb = [];
@@ -950,7 +955,7 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
     
 function addDDSeg(pt, prevPt, prevPrevPt, ddplot, ddplotNanos, ddplotnormals, ddplotVertexID) {
     var j;
-    ddplotVertex = new THREE.Vector3(Math.floor(prevPt[0] / 1000000), prevPt[5], prevPt[0] % 1000000);
+    var ddplotVertex = new THREE.Vector3(Math.floor(prevPt[0] / 1000000), prevPt[5], prevPt[0] % 1000000);
     for (j = 0; j < 4; j++) {
         ddplot.vertices.push(ddplotVertex);
         ddplotNanos.push(prevPt[1]);

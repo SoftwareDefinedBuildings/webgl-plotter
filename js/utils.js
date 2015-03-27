@@ -171,14 +171,27 @@ function packShaderUniforms(shader, affineMatrix, color, thickness, xAxis, yAxis
 /* Gets a the child of PARENT with index INDEX, creating a new mesh with frustumCulled set to false if necessary.
    Then sets it GEOMETRY and MATERIAL. */
 function setMeshChild(parent, index, geometry, material) {
-    var obj;
+    var obj, existing;
     if (index < parent.children.length) {
-        obj = parent.children[index];
+        existing = parent.children[index];
+        if (existing.geometry == geometry && existing.material == material) {
+            return;
+        }
+        // I got some of the code from the Object3D remove method. I don't
+        // want to call "remove" because that would be slow.
+        obj = new THREE.Mesh(geometry, material);
+        obj.frustumCulled = false;
+        
+        obj.parent = parent;
+        obj.dispatchEvent({type: "added"});
+        
+        parent.children[index] = obj;
+        
+        existing.parent = undefined;
+        existing.dispatchEvent({type: "removed"});
     } else {
-        obj = new THREE.Mesh();
+        obj = new THREE.Mesh(geometry, material);
         obj.frustumCulled = false;
         parent.add(obj);
     }
-    obj.geometry = geometry;
-    obj.material = material;
 }

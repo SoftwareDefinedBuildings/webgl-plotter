@@ -369,16 +369,16 @@ Plot.prototype.pollBracketsIfNecessary = function (finished) {
                     }
                     if (self.dataCache.updateToBrackets(JSON.parse(result), cutoff)) {
                         self.fullUpdate(function () {
-                                if (self.initializedSummaryGraph) {
-                                    self.drawSummary3();
-                                }
                                 self.fullUpdate(function () {
-                                        if (self.initializedGraph) {
-                                            self.drawGraph3();
+                                        if (self.initializedSummaryGraph) {
+                                            self.drawSummary3();
                                         }
                                         finished();
-                                    }, false);
-                            }, true);
+                                    }, true);
+                                if (self.initializedGraph) {
+                                    self.drawGraph3();
+                                }
+                            }, false);
                     } else {
                         finished();
                     }
@@ -455,8 +455,6 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                     self.cacheDataInAdvance(uuid, thisRequestID, pwe, loRequestTime, hiRequestTime);
                                 }, 1000);
                             
-                            var toDispose = [];
-                            
                             newDrawingCache[uuid] = entry;
                             numreplies += 1;
                             if (numreplies == numstreams) {
@@ -473,7 +471,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                         } else {
                                             cacheEntry.inPrimaryCache = false;
                                         }
-                                        toDispose.push(cacheEntry);
+                                        cacheEntry.disposeIfPossible();
                                         if (newDrawingCache.hasOwnProperty(cacheUuid)) { // the stream isn't being removed, just a different cache entry
                                             continue;
                                         }
@@ -533,12 +531,6 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                 }
                                 
                                 callback();
-                                
-                                //setTimeout(function () {
-                                        for (var i = 0; i < toDispose.length; i++) {
-                                            toDispose[i].disposeIfPossible();
-                                        }
-                                //    }, 20000);
                             }
                         };
                 })(currUUID), false);
@@ -689,30 +681,6 @@ Plot.prototype.initWVCursors = function () {
         this.wvcursor2 = new Cursor(this.getVirtualToRealPixelRatio.bind(this), true, this.summaryXAxis.rangeHi, this.plotbgGeom.vertices[15].y, this.plotbgGeom.vertices[14].y - this.plotbgGeom.vertices[15].y, 0.5, 2 * this.SCREENZ, animate, update);
         this.wvcursor2.addToPlotter(this.plotter);
     };
-
-Plot.prototype.drawGraph1 = function () {
-        // Normally we'd draw the x axis here. For now, I'm going to skip that.
-        this.startTime = this.plotter.selectedStartTime.slice(0, 2);
-        this.endTime = this.plotter.selectedEndTime.slice(0, 2);
-        this.xAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[4].x, this.plotbgGeom.vertices[5].x);
-        
-        var self = this;
-        this.fullUpdate(function () {
-                self.drawGraph2();
-            }, false);
-    };
-    
-Plot.prototype.drawSummary1 = function () {
-        // Normally we'd draw the x axis here. For now, I'm going to skip that.
-        this.startTime = this.plotter.selectedStartTime.slice(0, 2);
-        this.endTime = this.plotter.selectedEndTime.slice(0, 2);
-        this.summaryXAxis = new TimeAxis(this.startTime.slice(0), this.endTime.slice(0), this.plotbgGeom.vertices[15].x, this.plotbgGeom.vertices[13].x);
-        
-        var self = this;
-        this.fullUpdate(function () {
-                self.drawSummary2();
-            }, true);
-    };
     
 Plot.prototype.drawGraph2 = function () {
         // We draw the y axes here.
@@ -819,7 +787,7 @@ Plot.prototype.drawGraph3 = function () {
         // This is where we actually draw the graph.
         var THICKNESS = 0.15;
         var data;
-        var rangegraph;
+        var graph, rangegraph;
         var mesh;
         var meshNum = 0;
         if (this.plot == undefined) {
@@ -895,7 +863,7 @@ Plot.prototype.drawSummary3 = function () {
         // This is where we actually draw the graph.
         var THICKNESS = 0.15;
         var data;
-        var rangegraph;
+        var graph, rangegraph;
         var mesh;
         var meshNum = 0;
         if (this.wvplot == undefined) {

@@ -13,24 +13,22 @@ function PlotterUI(plotter, x, y) {
     this.y = y;
     
     // The PLOT button
-    var plotButton = new Button(40, 10, 0, 0xff0000, plotter);
-    plotButton.addToObject(this.plotterUI);
+    var plotButton = this.makeButton("Plot", 5, 40, 10, 0xff0000, 0x0000ff, 0x00ff00);
     plotButton.setPosition(25, -20);
-    plotButton.setText("Plot", 5, 0x00ff00);
     plotButton.setClickAction(function () { plotter.plotData(); });
-    plotButton.setPressAction(function () { plotButton.setColor(0x0000ff); });
-    plotButton.setReleaseAction(function () { plotButton.setColor(0xff0000); });
     this.plotButton = plotButton;
     
     // The PLOT ALL DATA button
-    var plotAllButton = new Button(40, 10, 0, 0xff0000, plotter);
-    plotAllButton.addToObject(this.plotterUI);
+    var plotAllButton = this.makeButton("Plot all Data", 5, 40, 10, 0xff0000, 0x0000ff, 0x00ff00);
     plotAllButton.setPosition(100, -20);
-    plotAllButton.setText("Plot all Data", 5, 0x00ff00);
     plotAllButton.setClickAction(function () { plotter.plotAllData(); });
-    plotAllButton.setPressAction(function () { plotAllButton.setColor(0x0000ff); });
-    plotAllButton.setReleaseAction(function () { plotAllButton.setColor(0xff0000); });
     this.plotAllButton = plotAllButton;
+    
+    // The ADD Y-AXIS button
+    var addAxisButton = this.makeButton("Add Y-Axis", 5, 40, 10, 0xff0000, 0x0000ff, 0x00ff00);
+    addAxisButton.setPosition(25, -40);
+    addAxisButton.setClickAction(function () { console.log("add axis"); });
+    this.addAxisButton = addAxisButton;
     
     this.plotterUI.position.set(x, y, 0);
     
@@ -40,4 +38,13 @@ function PlotterUI(plotter, x, y) {
 PlotterUI.prototype.setY = function (newY) {
         this.y = newY;
         this.plotterUI.position.setY(newY);
+    };
+    
+PlotterUI.prototype.makeButton = function (text, textsize, width, height, color, presscolor, textcolor) {
+        var newButton = new Button(width, height, 0, color, this.plotter);
+        newButton.addToObject(this.plotterUI);
+        newButton.setText(text, textsize, textcolor)
+        newButton.setPressAction(function () { newButton.setColor(presscolor); });
+        newButton.setReleaseAction(function () { newButton.setColor(color); });
+        return newButton;
     };

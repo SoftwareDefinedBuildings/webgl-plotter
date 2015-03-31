@@ -435,7 +435,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
         var hiRequestTime = roundTime(axis.domainHi.slice(0, 2));
         
         if (thisRequestID % 5 == 0) {
-            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 100000, 500000);
+            this.dataCache.limitMemory(streams, loRequestTime.slice(0), hiRequestTime.slice(0), pwe, 100000, 50000);
         }
         
         for (var streamnode = streams.head; streamnode !== null; streamnode = streamnode.next) {

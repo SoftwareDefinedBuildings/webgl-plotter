@@ -190,17 +190,19 @@ Cache.prototype.updateToBrackets = function (bracketResp, currEnd) {
                 } else {
                     // I don't know how far back the last legitimate time was, so I'm going to throw away the whole thing to be safe
                     this.lastTimes[uuid] = bracketResp[uuid][1];
-                    this.loadedData -= this.loadedStreams[uuid];
-                    for (pointwidth in this.dataCache[uuid]) {
-                        if (this.dataCache[uuid].hasOwnProperty(pointwidth)) {
-                            for (var i = 0; i < this.dataCache[uuid][pointwidth].length; i++) {
-                                this.dataCache[uuid][pointwidth][i].removeFromSecCache();
+                    if (this.loadedStreams.hasOwnProperty(uuid)) {
+                        this.loadedData -= this.loadedStreams[uuid];
+                        for (pointwidth in this.dataCache[uuid]) {
+                            if (this.dataCache[uuid].hasOwnProperty(pointwidth)) {
+                                for (var i = 0; i < this.dataCache[uuid][pointwidth].length; i++) {
+                                    this.dataCache[uuid][pointwidth][i].removeFromSecCache();
+                                }
                             }
                         }
+                        delete this.dataCache[uuid];
+                        delete this.loadedStreams[uuid];
+                        mustRefresh = true;
                     }
-                    delete this.dataCache[uuid];
-                    delete this.loadedStreams[uuid];
-                    mustRefresh = true;
                 }
             }
         }
@@ -648,6 +650,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         if (this.loadedData < threshold) {
             return false;
         }
+        
         var dataCache = this.dataCache;
         var loadedStreams = this.loadedStreams;
         var i, j, k;
@@ -656,11 +659,12 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         var uuid;
         var used;
         var pointwidth;
+        var node;
         for (uuid in dataCache) {
             if (dataCache.hasOwnProperty(uuid)) {
                 used = false;
-                for (i = 0; i < streams.length; i++) {
-                    if (streams[i].uuid == uuid) {
+                for (node = streams.head; node !== null; node = node.next) {
+                    if (node.elem.uuid == uuid) {
                         used = true;
                         break;
                     }
@@ -685,13 +689,13 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         if (this.loadedData <= target) {
             return true;
         }
-        
+
         // Delete extra point width caches, if deleting streams wasn't enough
         var cache;
         var pointwidth, pointwidths;
         var pwMap = {}; // Maps uuid to 2-element array containing sorted array of pointwidths, and index of current pointwidth (if it were in the sorted array)
-        for (i = 0; i < streams.length; i++) {
-            cache = dataCache[streams[i].uuid];
+        for (node = streams.head; node !== null; node = node.next) {
+            cache = dataCache[node.elem.uuid];
             pointwidths = [];
             for (pointwidth in cache) {
                 if (pointwidth != currPWE && cache.hasOwnProperty(pointwidth)) {
@@ -700,14 +704,14 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
             }
             pointwidths.sort(function (a, b) { return a - b; });
             j = binSearch(pointwidths, currPWE, function (x) { return x; });
-            pwMap[streams[i].uuid] = [pointwidths, j];
+            pwMap[node.elem.uuid] = [pointwidths, j];
         }
         var remaining = true; // There are still pointwidths to remove
         var pwdata, pwcount;
         while (remaining) {
             remaining = false;
-            for (i = 0; i < streams.length; i++) {
-                uuid = streams[i].uuid;
+            for (node = streams.head; node !== null; node = node.next) {
+                uuid = node.elem.uuid;
                 pointwidths = pwMap[uuid][0];
                 j = pwMap[uuid][1];
                 if (pointwidths.length != 0) {
@@ -735,8 +739,8 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
         }
         
         // Delete extra cache entries in the current pointwidth, if deleting streams and pointwidths was not enough
-        for (i = 0; i < streams.length; i++) {
-            pwdata = dataCache[streams[i].uuid][currPWE];
+        for (node = streams.head; node !== null; node = node.next) {
+            pwdata = dataCache[node.elem.uuid][currPWE];
             pwcount = 0;
             for (j = pwdata.length - 1; j >= 0; j--) {
                 if ((cmpTimes(pwdata[j].start_time, startTime) <= 0 && cmpTimes(pwdata[j].end_time, endTime) >= 0) || (cmpTimes(pwdata[j].start_time, startTime) >= 0 && cmpTimes(pwdata[j].start_time, endTime) <= 0) || (cmpTimes(pwdata[j].end_time, startTime) >= 0 && cmpTimes(pwdata[j].end_time, endTime) <= 0)) {
@@ -747,7 +751,7 @@ Cache.prototype.limitMemory = function (streams, startTime, endTime, currPWE, th
                 pwdata.splice(j, 1);
             }
             this.loadedData -= pwcount;
-            loadedStreams[streams[i].uuid] -= pwcount;
+            loadedStreams[node.elem.uuid] -= pwcount;
             if (this.loadedData <= target) {
                 return true;
             }
@@ -940,10 +944,14 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
         normals.push(Cache.zNormal);
         normals.push(Cache.zNormal);
         
+        graph.dynamic = false;
+        rangegraph.dynamic = false;
+        ddplot.dynamic = false;
+        
         cacheEntry.cached_drawing.pwe = pwe;
         cacheEntry.cached_drawing.graph = graph;
         cacheEntry.cached_drawing.rangegraph = rangegraph;
-        cacheEntry.cached_drawing.ddplot = ddplot
+        cacheEntry.cached_drawing.ddplot = ddplot;
         cacheEntry.cached_drawing.normals = normals;
         cacheEntry.cached_drawing.timeNanos = timeNanos;
         cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;

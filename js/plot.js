@@ -198,6 +198,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
 }
 
 Plot.prototype.AXISWIDTH = 5;
+Plot.prototype.INSERT_DELAY = 5000; // It takes QUASAR five seconds to finalize an insert
 
 Plot.prototype.getVirtualToRealPixelRatio = function () {
         this.recomputePixelsWideIfNecessary();
@@ -368,17 +369,19 @@ Plot.prototype.pollBracketsIfNecessary = function (finished) {
                         cutoff = self.summaryXAxis.domainHi;
                     }
                     if (self.dataCache.updateToBrackets(JSON.parse(result), cutoff)) {
-                        self.fullUpdate(function () {
+                        setTimeout(function () {
                                 self.fullUpdate(function () {
-                                        if (self.initializedSummaryGraph) {
-                                            self.drawSummary3();
+                                        self.fullUpdate(function () {
+                                                if (self.initializedSummaryGraph) {
+                                                    self.drawSummary3();
+                                                }
+                                                finished();
+                                            }, true);
+                                        if (self.initializedGraph) {
+                                            self.drawGraph3();
                                         }
-                                        finished();
-                                    }, true);
-                                if (self.initializedGraph) {
-                                    self.drawGraph3();
-                                }
-                            }, false);
+                                    }, false);
+                            }, this.INSERT_DELAY);
                     } else {
                         finished();
                     }

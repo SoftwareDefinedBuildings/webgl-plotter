@@ -381,7 +381,7 @@ Plot.prototype.pollBracketsIfNecessary = function (finished) {
                                             self.drawGraph3();
                                         }
                                     }, false);
-                            }, this.INSERT_DELAY);
+                            }, self.INSERT_DELAY);
                     } else {
                         finished();
                     }

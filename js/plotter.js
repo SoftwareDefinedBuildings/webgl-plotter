@@ -142,11 +142,11 @@ function Plotter() {
     
     var setting;
     
-    setting = this.settings.addStream({uuid: "9f67541c-95ee-11e4-a7ac-0026b6df9cf2", Properties: {UnitofMeasure: 'V'}});
+    setting = this.addStream({uuid: "9f67541c-95ee-11e4-a7ac-0026b6df9cf2", Properties: {UnitofMeasure: 'V'}, Path: "/vRandom"});
     setting.setColor(new THREE.Vector3(0, 0, 1));
     setting.select();
     
-    setting = this.settings.addStream({uuid: "221b154e-95de-11e4-bf98-0026b6df9cf2", Properties: {UnitofMeasure: 'N'}});
+    setting = this.addStream({uuid: "221b154e-95de-11e4-bf98-0026b6df9cf2", Properties: {UnitofMeasure: 'N'}, Path: "/nRandom"});
     setting.setColor(new THREE.Vector3(1, 0, 0));
 
     this.selectedStartTime = [1420553456000, 0];
@@ -175,6 +175,20 @@ Plotter.prototype.plotAllData = function () {
                 self.selectedEndTime = times.Merged[1];
                 self.plotData();
             });
+    };
+    
+Plotter.prototype.addStream = function (stream) {
+        var axisTable = this.plotterUI.axisTable;
+        var setting = this.settings.addStream(stream);
+        var axisid = setting.axisid;
+        var axisrow;
+        if (axisTable.hasAxis(axisid)) {
+            axisrow = axisTable.getAxisEntry(axisid);
+        } else {
+            axisrow = axisTable.addAxis(this.settings.getAxis(axisid));
+        }
+        axisrow.addStream(stream);
+        return setting;
     };
 
 Plotter.prototype.updateScreenSize = function () {

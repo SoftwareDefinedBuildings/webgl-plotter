@@ -83,6 +83,7 @@ Settings.prototype.addStream = function (metadata, color) {
         
         // Add the stream to the axis
         axis.addStream(metadata);
+        setting.axisid = axis.axisid;
         
         return setting;
     };
@@ -110,6 +111,13 @@ Settings.prototype.newAxis = function () {
     
 Settings.prototype.getAxes = function () {
         return this.axes;
+    };
+    
+Settings.prototype.getAxis = function (axisid) {
+        if (this.axisMap.hasOwnProperty(axisid)) {
+            return this.axisMap[axisid].elem;
+        }
+        console.log("Invalid Axis ID " + axisid);
     };
     
 Settings.prototype.rmAxis = function (axisid) {

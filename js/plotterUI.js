@@ -30,6 +30,11 @@ function PlotterUI(plotter, x, y) {
     addAxisButton.setClickAction(function () { console.log("add axis"); });
     this.addAxisButton = addAxisButton;
     
+    // The Axis Table
+    var axisTable = new AxisTable(10, -40, 0);
+    axisTable.addToObject(this.plotterUI);
+    this.axisTable = axisTable;
+    
     this.plotterUI.position.set(x, y, 0);
     
     plotter.scene.add(this.plotterUI);

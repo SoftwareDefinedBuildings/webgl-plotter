@@ -1,22 +1,36 @@
 /** Encapsulates the table of axes and streams. */
-function AxisTable() {
+function AxisTable(x, y, z) {
     this.obj = new THREE.Object3D();
+    this.obj.position.set(x, y, z);
     
     this.totalEntryHeight = 0;
     
-    this.streamMap = {}; // maps axis id to AxisTableEntry;
+    this.axisMap = {}; // maps axis id to AxisTableEntry;
     this.currAxes = []; // the AxisTableEntries currently in the table
 }
+
+AxisTable.prototype.addToObject = function (obj) {
+        obj.add(this.obj);
+    };
+
+AxisTable.prototype.hasAxis = function (axisid) {
+        return this.axisMap.hasOwnProperty(axisid);
+    };
+    
+AxisTable.prototype.getAxisEntry = function (axisid) {
+        return this.axisMap[axisid];
+    };
 
 AxisTable.prototype.addAxis = function (axisObj) {
         var newentry = new AxisTableEntry(axisObj);
         newentry.index = this.currAxes.length;
         this.currAxes.push(newentry);
-        this.streamMap[axisObj.axisid] = newentry;
+        this.axisMap[axisObj.axisid] = newentry;
         newentry.measuredHeight = newentry.getHeight();
         this.totalEntryHeight += newentry.measuredHeight;
         newentry.entry.position.setY(-this.totalEntryHeight);
         this.obj.add(newentry.entry);
+        return newentry;
     };
     
 AxisTable.prototype.updateHeight = function (axisid) {
@@ -61,7 +75,7 @@ function AxisTableEntry(axisObj) {
     
     this.axisname = new THREE.Object3D();
     this.streams = new THREE.Object3D();
-    this.streams.translateX(this.STREAMX);
+    this.streams.position.setX(this.STREAMX);
     this.updateUnits();
     
     this.entry.add(this.axisname);
@@ -71,8 +85,9 @@ function AxisTableEntry(axisObj) {
 
 AxisTableEntry.prototype.TEXTHEIGHT = 0.1;
 AxisTableEntry.prototype.TEXTSIZE = 5;
-AxisTableEntry.prototype.STREAMX = 50;
-AxisTableEntry.prototype.UNITX = 100;
+AxisTableEntry.prototype.STREAMX = 10;
+AxisTableEntry.prototype.UNITX = 150;
+AxisTableEntry.prototype.LINEHEIGHT = 6;
 
 AxisTableEntry.prototype.addStream = function (stream) {
         var newrow = new AxisTableStream(stream);
@@ -80,7 +95,6 @@ AxisTableEntry.prototype.addStream = function (stream) {
         this.currStreams.push(newrow);
         this.streamMap[stream.uuid] = newrow;
         this.totalStreamHeight += newrow.height;
-        newrow.streamRow.position.setY(-this.totalStreamHeight);
         this.streams.add(newrow.streamRow);
     };
     
@@ -114,12 +128,12 @@ AxisTableEntry.prototype.updateUnits = function () {
         }
         var textgeom = new THREE.TextGeometry(units.join(", "), {size: this.TEXTSIZE, height: this.TEXTHEIGHT});
         this.units = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
-        this.units.translateX(this.UNITX);
+        this.units.position.setX(this.UNITX);
         this.entry.add(this.units);
     };
     
 AxisTableEntry.prototype.getHeight = function () {
-        return Math.max(this.TEXTSIZE, this.totalStreamHeight);
+        return Math.max(this.LINEHEIGHT, this.totalStreamHeight);
     };
     
 AxisTableEntry.prototype.dispose = function () {
@@ -145,9 +159,10 @@ AxisTableStream.prototype.THRESHPATHLEN = 40;
 AxisTableStream.prototype.MAXPATHLEN = 50;
 AxisTableStream.prototype.TEXTHEIGHT = 0.1;
 AxisTableStream.prototype.TEXTSIZE = 5;
+AxisTableStream.prototype.LINEHEIGHT = 6;
 
 AxisTableStream.prototype.updatePath = function () {
-        var path = getFilePath(this.stream);
+        var path = getFilepath(this.stream);
         var pathlen = path.length;
         
         var rowlen = this.THRESHPATHLEN;
@@ -165,7 +180,7 @@ AxisTableStream.prototype.updatePath = function () {
         }
         
         var obj;
-        for (i = this.streamRow.children.length; i >= 0; i--) {
+        for (i = this.streamRow.children.length - 1; i >= 0; i--) {
             obj = this.streamRow.children[i];
             this.streamRow.remove(obj);
             obj.geometry.dispose();
@@ -174,12 +189,12 @@ AxisTableStream.prototype.updatePath = function () {
         var textgeom;
         for (i = 0; i < rows.length; i++) {
             textgeom = new THREE.TextGeometry(rows[i], {size: this.TEXTSIZE, height: this.TEXTHEIGHT});
-            obj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0xffffff}));
-            obj.translateY(-i * this.TEXTSIZE);
+            obj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
+            obj.translateY(-i * this.LINEHEIGHT);
             this.streamRow.add(obj);
         }
         
-        this.height = i * this.TEXTSIZE;
+        this.height = i * this.LINEHEIGHT;
     };
     
 AxisTableStream.prototype.dispose = function () {

@@ -198,6 +198,9 @@ function setMeshChild(parent, index, geometry, material) {
 
 function getFilepath(datum) {
     var rawpath = datum.Path;
-    var sourceName = datum.Metadata.SourceName;
+    var sourceName = undefined;
+    if (datum.hasOwnProperty("Metadata")) {
+        sourceName = datum.Metadata.SourceName;
+    }
     return (sourceName == undefined ? '<no source name>' : sourceName) + rawpath;
 }

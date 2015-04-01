@@ -1,9 +1,51 @@
 /** Encapsulates the table of axes and streams. */
 function AxisTable() {
     this.obj = new THREE.Object3D();
+    
+    this.totalEntryHeight = 0;
+    
+    this.streamMap = {}; // maps axis id to AxisTableEntry;
+    this.currAxes = []; // the AxisTableEntries currently in the table
 }
 
 AxisTable.prototype.addAxis = function (axisObj) {
+        var newentry = new AxisTableEntry(axisObj);
+        newentry.index = this.currAxes.length;
+        this.currAxes.push(newentry);
+        this.streamMap[axisObj.axisid] = newentry;
+        newentry.measuredHeight = newentry.getHeight();
+        this.totalEntryHeight += newentry.measuredHeight;
+        newentry.entry.position.setY(-this.totalEntryHeight);
+        this.obj.add(newentry.entry);
+    };
+    
+AxisTable.prototype.updateHeight = function (axisid) {
+        var entry = this.axisMap[axisid];
+        var newHeight = entry.getHeight();
+        var diff = entry.measuredHeight - newHeight;
+        entry.measuredHeight = newHeight;
+        for (var i = entry.index + 1; i < this.currAxes.length; i++) {
+            this.currAxes[i].entry.translateY(diff);
+        }
+        this.totalEntryHeight -= diff;
+    };
+    
+AxisTable.prototype.rmAxis = function (axisid) {
+        var entry = this.axisMap[axisid];
+        delete this.axisMap[axisid];
+        var rmHeight = entry.getHeight();
+        var futEntry;
+        for (var i = entry.index + 1; i < this.currAxes.length; i++) {
+            futEntry = this.currAxes[i];
+            this.currAxes[i - 1] = futEntry;
+            futEntry.index--;
+            futEntry.entry.translateY(rmHeight);
+        }
+        this.currAxes.pop();
+        this.totalEntryHeight -= rmHeight;
+        
+        this.obj.remove(entry.entry);
+        entry.dispose();
     };
     
 
@@ -78,6 +120,13 @@ AxisTableEntry.prototype.updateUnits = function () {
     
 AxisTableEntry.prototype.getHeight = function () {
         return Math.max(this.TEXTSIZE, this.totalStreamHeight);
+    };
+    
+AxisTableEntry.prototype.dispose = function () {
+        for (var i = this.currStreams.length - 1; i >= 0; i--) {
+            this.entry.remove(this.currStreams[i].streamRow);
+            this.currStreams[i].dispose();
+        }
     };
     
     

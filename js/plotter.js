@@ -190,6 +190,22 @@ Plotter.prototype.addStream = function (stream) {
         axisrow.addStream(stream);
         return setting;
     };
+    
+Plotter.prototype.rmAxis = function (axisid) {
+        var self = this;
+        var affectedEntries = [];
+        if (this.settings.rmAxis(axisid, function (stream, axis) {
+                var entry = self.plotterUI.axisTable.getAxisEntry(axis.axisid);
+                entry.addStream(stream);
+                affectedEntries.push(entry);
+                self.plotterUI.axisTable.updateHeight(axis.axisid);
+            })) {
+            this.plotterUI.axisTable.rmAxis(axisid);
+            for (var i = 0; i < affectedEntries.length; i++) {
+                affectedEntries[i].updateUnits();
+            }
+        }
+    };
 
 Plotter.prototype.updateScreenSize = function () {
         this.width = 0.9 * Math.min(window.innerWidth, 10000);

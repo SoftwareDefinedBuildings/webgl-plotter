@@ -38,6 +38,7 @@ Button.prototype.setPosition = function (x, y, z) {
     
 Button.prototype.setColor = function (newColor) {
         this.material.color.setHex(newColor);
+        this.material.needsUpdate = true;
     };
     
 Button.prototype.setText = function (text, size, color) {
@@ -80,6 +81,12 @@ Button.prototype.release = function () {
 Button.prototype.dispose = function () {
         this.geom.dispose();
         if (this.textgeom !== undefined) {
-            this.texgeom.dispose();
+            this.textgeom.dispose();
+        }
+        for (var i = 0; i < this.plotter.clickables.length; i++) {
+            if (this.plotter.clickables[i] === this.obj) {
+                this.plotter.clickables.splice(i, 1);
+                break;
+            }
         }
     };

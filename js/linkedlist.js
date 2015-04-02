@@ -41,11 +41,16 @@ LinkedList.prototype.unshift = function (entry) {
     };
     
 LinkedList.prototype.removeNode = function (node) {
-        if (node.next != null) {
+        if (node.next !== null) {
             node.next.prev = node.prev;
         }
-        if (node.prev != null) {
+        if (node.prev !== null) {
             node.prev.next = node.next;
+        }
+        if (this.head == node) {
+            this.head = node.next;
+        } else if (this.tail == node) {
+            this.tail = node.prev;
         }
         this.len--;
         return node;

@@ -1,5 +1,7 @@
 /** Encapsulates the table of axes and streams. */
-function AxisTable(x, y, z) {
+function AxisTable(x, y, z, plotter) {
+    this.plotter = plotter;
+    
     this.obj = new THREE.Object3D();
     this.obj.position.set(x, y, z);
     
@@ -22,7 +24,7 @@ AxisTable.prototype.getAxisEntry = function (axisid) {
     };
 
 AxisTable.prototype.addAxis = function (axisObj) {
-        var newentry = new AxisTableEntry(axisObj);
+        var newentry = new AxisTableEntry(axisObj, this.plotter);
         newentry.index = this.currAxes.length;
         this.currAxes.push(newentry);
         this.axisMap[axisObj.axisid] = newentry;
@@ -44,6 +46,7 @@ AxisTable.prototype.updateHeight = function (axisid) {
         this.totalEntryHeight -= diff;
     };
     
+/** Does NOT take care of reassigning streams to different axes. */
 AxisTable.prototype.rmAxis = function (axisid) {
         var entry = this.axisMap[axisid];
         delete this.axisMap[axisid];
@@ -64,7 +67,9 @@ AxisTable.prototype.rmAxis = function (axisid) {
     
 
 /** Represents an Axis in the AxisTable. */
-function AxisTableEntry(axisObj) {
+function AxisTableEntry(axisObj, plotter) {
+    this.plotter = plotter;
+    
     this.axis = axisObj;
     this.entry = new THREE.Object3D();
     
@@ -78,24 +83,34 @@ function AxisTableEntry(axisObj) {
     this.streams.position.setX(this.STREAMX);
     this.updateUnits();
     
+    this.remove = plotter.plotterUI.makeButton("X", this.TEXTSIZE, this.BUTTONHEIGHT, this.BUTTONHEIGHT, 0xff0000, 0x0000ff, 0x000000);
+    this.remove.setClickAction(function () {
+            plotter.rmAxis(axisObj.axisid);
+        });
+    this.remove.setPosition(this.BUTTONX, 0);
+    
     this.entry.add(this.axisname);
     this.entry.add(this.streams);
     this.entry.add(this.units);
+    this.remove.addToObject(this.entry);
 }
 
 AxisTableEntry.prototype.TEXTHEIGHT = 0.1;
 AxisTableEntry.prototype.TEXTSIZE = 5;
 AxisTableEntry.prototype.STREAMX = 10;
 AxisTableEntry.prototype.UNITX = 150;
-AxisTableEntry.prototype.LINEHEIGHT = 6;
+AxisTableEntry.prototype.LINEHEIGHT = 7;
+AxisTableEntry.prototype.BUTTONHEIGHT = 6;
+AxisTableEntry.prototype.BUTTONX = 180;
 
 AxisTableEntry.prototype.addStream = function (stream) {
         var newrow = new AxisTableStream(stream);
         newrow.index = this.currStreams.length;
         this.currStreams.push(newrow);
         this.streamMap[stream.uuid] = newrow;
-        this.totalStreamHeight += newrow.height;
         this.streams.add(newrow.streamRow);
+        newrow.streamRow.position.setY(-this.totalStreamHeight);
+        this.totalStreamHeight += newrow.height;
     };
     
 AxisTableEntry.prototype.rmStream = function (uuid) {
@@ -141,6 +156,7 @@ AxisTableEntry.prototype.dispose = function () {
             this.entry.remove(this.currStreams[i].streamRow);
             this.currStreams[i].dispose();
         }
+        this.remove.dispose();
     };
     
     

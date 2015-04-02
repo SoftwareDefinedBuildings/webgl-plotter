@@ -120,24 +120,33 @@ Settings.prototype.getAxis = function (axisid) {
         console.log("Invalid Axis ID " + axisid);
     };
     
-Settings.prototype.rmAxis = function (axisid) {
-        if (this.axes.len == 0) {
-            return;
+/** Removes the specified axis, reassigning that axis' streams to other axes.
+    Calls the specified callback function, if provided, for each reassignment,
+    passing in the stream object as the first argument, and the axis it's being
+    reassigned to as the second argument. */
+Settings.prototype.rmAxis = function (axisid, callback) {
+        if (this.axes.len <= 1) {
+            return false;
         }
+        callback = callback || function () {};
         var node = this.axes.removeNode(this.axisMap[axisid]);
         delete this.axisMap[axisid];
         var streams = node.elem.streams; // a linked list of streams that we have to reassign to new axes
         var unit;
-        for (var streamnode = stream.head; streamnode != null; streamnode = streamnode.next) {
+        for (var streamnode = streams.head; streamnode !== null; streamnode = streamnode.next) {
             unit = streamnode.elem.Properties.UnitofMeasure;
-            for (var axisnode = this.axes.head; axisnode != null; axisnode = axisnode.next) {
+            var axisnode;
+            for (axisnode = this.axes.head; axisnode !== null; axisnode = axisnode.next) {
                 if (axisnode.elem.units.hasOwnProperty(unit) && axisnode.elem.units[unit] > 0) {
                     axisnode.elem.addStream(streamnode.elem)
+                    callback(streamnode.elem, axisnode.elem);
                     break;
                 }
             }
-            if (axisnode == null) { // no other axis had the stream's unit, so add it to the last axis
+            if (axisnode === null) { // no other axis had the stream's unit, so add it to the last axis
                 this.axes.tail.elem.addStream(streamnode.elem);
+                callback(streamnode.elem, this.axes.tail.elem);
             }
         }
+        return true;
     };

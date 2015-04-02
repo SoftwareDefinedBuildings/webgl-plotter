@@ -175,7 +175,10 @@ AxisTableStream.prototype.THRESHPATHLEN = 40;
 AxisTableStream.prototype.MAXPATHLEN = 50;
 AxisTableStream.prototype.TEXTHEIGHT = 0.1;
 AxisTableStream.prototype.TEXTSIZE = 5;
-AxisTableStream.prototype.LINEHEIGHT = 6;
+AxisTableStream.prototype.LINEHEIGHT = 7;
+AxisTableStream.prototype.BOTTOMLEFTEDGE = 1;
+AxisTableStream.prototype.BACKHEIGHTOFFSET = -0.5;
+AxisTableStream.prototype.TEXTWIDTH = AxisTableEntry.prototype.UNITX - AxisTableEntry.prototype.STREAMX - 1;
 
 AxisTableStream.prototype.updatePath = function () {
         var path = getFilepath(this.stream);
@@ -196,25 +199,42 @@ AxisTableStream.prototype.updatePath = function () {
         }
         
         var obj;
-        for (i = this.streamRow.children.length - 1; i >= 0; i--) {
-            obj = this.streamRow.children[i];
-            this.streamRow.remove(obj);
-            obj.geometry.dispose();
+        var textentry = this.streamRow.children[0];
+        if (textentry !== undefined) {
+            this.streamRow.remove(textentry);
+            for (i = textentry.children.length - 1; i >= 0; i--) {
+                textentry.children[i].geometry.dispose();
+            }
+            textentry.geometry.dispose();
         }
         
+        this.height = rows.length * this.LINEHEIGHT;
+        
+        var backheight = this.height + this.BACKHEIGHTOFFSET - this.BOTTOMLEFTEDGE;
+        var backgeom = new THREE.Geometry();
+        backgeom.vertices.push(new THREE.Vector3(-this.BOTTOMLEFTEDGE, -this.BOTTOMLEFTEDGE, 0), new THREE.Vector3(this.TEXTWIDTH, -this.BOTTOMLEFTEDGE, 0), new THREE.Vector3(this.TEXTWIDTH, backheight, 0), new THREE.Vector3(-this.BOTTOMLEFTEDGE, backheight, 0));
+        backgeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+        textentry = new THREE.Mesh(backgeom, new THREE.MeshBasicMaterial({color: 0x888888}));
+        
         var textgeom;
+        var textobjs = [];
         for (i = 0; i < rows.length; i++) {
             textgeom = new THREE.TextGeometry(rows[i], {size: this.TEXTSIZE, height: this.TEXTHEIGHT});
             obj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
             obj.translateY(-i * this.LINEHEIGHT);
-            this.streamRow.add(obj);
+            textentry.add(obj);
         }
         
-        this.height = i * this.LINEHEIGHT;
+        this.streamRow.add(textentry);
     };
     
 AxisTableStream.prototype.dispose = function () {
-        for (var i = 0; i < this.streamRow.children.length; i++) {
-            this.streamRow.children[i].geometry.dispose();
+        var textentry = this.streamRow.children[0];
+        if (textentry !== undefined) {
+            this.streamRow.remove(textentry);
+            for (i = textentry.children.length - 1; i >= 0; i--) {
+                textentry.children[i].geometry.dispose();
+            }
+            textentry.geometry.dispose();
         }
     };

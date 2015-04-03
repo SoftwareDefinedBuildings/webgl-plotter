@@ -104,7 +104,7 @@ AxisTableEntry.prototype.BUTTONHEIGHT = 6;
 AxisTableEntry.prototype.BUTTONX = 180;
 
 AxisTableEntry.prototype.addStream = function (stream) {
-        var newrow = new AxisTableStream(stream);
+        var newrow = new AxisTableStream(stream, this.plotter);
         newrow.index = this.currStreams.length;
         this.currStreams.push(newrow);
         this.streamMap[stream.uuid] = newrow;
@@ -160,7 +160,7 @@ AxisTableEntry.prototype.dispose = function () {
     };
     
     
-function AxisTableStream(streamObj) {
+function AxisTableStream(streamObj, plotter) {
     this.stream = streamObj;
     
     // Contains each row of the path as a separate child object
@@ -168,7 +168,11 @@ function AxisTableStream(streamObj) {
     
     this.height = 0;
     
+    this.plotter = plotter;
+    
     this.updatePath();
+    
+    this.startPos = new THREE.Vector3();
 }
 
 AxisTableStream.prototype.THRESHPATHLEN = 40;
@@ -193,19 +197,26 @@ AxisTableStream.prototype.updatePath = function () {
         
         var rows = [];
         
-        var i;
+        var i, dragIndex;
         for (i = 0; i < pathlen; i += rowlen) {
             rows.push(path.slice(i, i + rowlen));
         }
         
         var obj;
         var textentry = this.streamRow.children[0];
-        if (textentry !== undefined) {
+        if (textentry === undefined) {
+            dragIndex = this.plotter.draggables.length;
+        } else {
             this.streamRow.remove(textentry);
             for (i = textentry.children.length - 1; i >= 0; i--) {
                 textentry.children[i].geometry.dispose();
             }
             textentry.geometry.dispose();
+            for (dragIndex = 0; dragIndex < this.plotter.draggables.length; dragIndex++) {
+                if (this.plotter.draggables[dragIndex] == textentry) {
+                    break;
+                }
+            }
         }
         
         this.height = rows.length * this.LINEHEIGHT;
@@ -224,8 +235,14 @@ AxisTableStream.prototype.updatePath = function () {
             obj.translateY(-i * this.LINEHEIGHT);
             textentry.add(obj);
         }
+        textentry.startDrag = this.startDrag.bind(this);
+        textentry.stopDrag = this.stopDrag.bind(this);
+        textentry.drag = this.drag.bind(this);
+        this.plotter.draggables[dragIndex] = textentry;
         
         this.streamRow.add(textentry);
+        
+        this.streamRow.children[0].geometry.computeBoundingSphere();
     };
     
 AxisTableStream.prototype.dispose = function () {
@@ -236,5 +253,26 @@ AxisTableStream.prototype.dispose = function () {
                 textentry.children[i].geometry.dispose();
             }
             textentry.geometry.dispose();
+            for (i = 0; i < this.plotter.draggables.length; i++) {
+                if (this.plotter.draggables[i] == textentry) {
+                    this.plotter.draggables.splice(i, 1);
+                }
+            }
         }
     };
+    
+AxisTableStream.prototype.startDrag = function () {
+        this.startPos.copy(this.streamRow.position);
+        this.streamRow.translateZ(1);
+    };
+    
+AxisTableStream.prototype.stopDrag = function () {
+        this.streamRow.position.copy(this.startPos);
+    };
+    
+AxisTableStream.prototype.drag = function (x, y) {
+        this.streamRow.translateX(x * this.plotter.VIRTUAL_WIDTH / this.plotter.width);
+        this.streamRow.translateY(-y * this.plotter.VIRTUAL_WIDTH / this.plotter.width);
+    };
+
+

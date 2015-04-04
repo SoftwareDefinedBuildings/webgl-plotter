@@ -24,7 +24,7 @@ function StreamAxis(id, domainLo, domainHi, rangeLo, rangeHi) {
     this.streamMap = {}; // maps uuid of a stream to its node in the Linked List
     this.units = {};
     this.autoscale = true;
-    this.right = false;
+    this.right = false; // true means it's on the right side, false means it's on the left side, null means it's hidden
 }
 StreamAxis.prototype = Object.create(Axis.prototype); // extends Axis
 
@@ -150,13 +150,15 @@ Settings.prototype.rmAxis = function (axisid, callback) {
             var axisnode;
             for (axisnode = this.axes.head; axisnode !== null; axisnode = axisnode.next) {
                 if (axisnode.elem.units.hasOwnProperty(unit) && axisnode.elem.units[unit] > 0) {
-                    axisnode.elem.addStream(streamnode.elem)
+                    axisnode.elem.addStream(streamnode.elem);
+                    this.settingMap[streamnode.elem.uuid].axisid = axisnode.elem.axisid;
                     callback(streamnode.elem, axisnode.elem);
                     break;
                 }
             }
             if (axisnode === null) { // no other axis had the stream's unit, so add it to the last axis
                 this.axes.tail.elem.addStream(streamnode.elem);
+                this.settingMap[streamnode.elem.uuid].axisid = this.axes.tail.elem.axisid;
                 callback(streamnode.elem, this.axes.tail.elem);
             }
         }

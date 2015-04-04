@@ -27,7 +27,7 @@ function PlotterUI(plotter, x, y) {
     // The ADD Y-AXIS button
     var addAxisButton = this.makeButton("Add Y-Axis", 5, 40, 10, 0xff0000, 0x0000ff, 0x00ff00);
     addAxisButton.setPosition(25, -40);
-    addAxisButton.setClickAction(function () { console.log("add axis"); });
+    addAxisButton.setClickAction(function () { plotter.addAxis(); });
     this.addAxisButton = addAxisButton;
     
     // The Axis Table

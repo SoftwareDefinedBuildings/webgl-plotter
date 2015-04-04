@@ -177,6 +177,12 @@ Plotter.prototype.plotAllData = function () {
             });
     };
     
+Plotter.prototype.addAxis = function () {
+        var axis = this.settings.newAxis();
+        this.plotterUI.axisTable.addAxis(axis);
+        return axis.axisid;
+    };
+    
 Plotter.prototype.addStream = function (stream) {
         var axisTable = this.plotterUI.axisTable;
         var setting = this.settings.addStream(stream);
@@ -188,6 +194,7 @@ Plotter.prototype.addStream = function (stream) {
             axisrow = axisTable.addAxis(this.settings.getAxis(axisid));
         }
         axisrow.addStream(stream);
+        axisTable.updateHeight(axisid);
         return setting;
     };
     
@@ -219,6 +226,16 @@ Plotter.prototype.rmAxis = function (axisid) {
             for (var i = 0; i < affectedEntries.length; i++) {
                 affectedEntries[i].updateUnits();
             }
+        }
+    };
+    
+/** If suppressUIUpdate is set to true, then the UI will not be updated. */
+Plotter.prototype.setAxisLocation = function (axisid, right, suppressUIUpdate) {
+        if (suppressUIUpdate) { // yes, skip if not suppressing UI update. The function will be called again when updating the UI so this will still happen.
+            this.settings.getAxis(axisid).right = right;
+        } else {
+            var index = right ? 2 : right === null ? 1 : 0;
+            this.plotterUI.axisTable.axisMap[axisid].loc.getButton(index).click();
         }
     };
 

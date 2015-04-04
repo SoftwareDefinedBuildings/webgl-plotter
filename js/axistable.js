@@ -89,19 +89,41 @@ function AxisTableEntry(axisObj, plotter) {
         });
     this.remove.setPosition(this.BUTTONX, 0);
     
+    this.loc = new SelectableButtonGroup(3, this.LOCBUTTONWIDTH, this.BUTTONHEIGHT, 0, 0x00ffff, plotter);
+    var button;
+    button = this.loc.getButton(0);
+    button.setText("<-", this.TEXTSIZE, 0x000000);
+    button.setPosition(this.BUTTONX + this.BUTTONHEIGHT + 1, 0);
+    button.click(); // Initially selected
+    button = this.loc.getButton(1);
+    button.setText("H", this.TEXTSIZE, 0x000000);
+    button.setPosition(this.BUTTONX + this.BUTTONHEIGHT + 2 + this.LOCBUTTONWIDTH, 0);
+    button = this.loc.getButton(2);
+    button.setText("->", this.TEXTSIZE, 0x000000);
+    button.setPosition(this.BUTTONX + this.BUTTONHEIGHT + 3 + 2 * this.LOCBUTTONWIDTH, 0);
+    this.loc.setSelectAction(function (index, button) {
+            button.setColor(0x00ff00);
+            plotter.setAxisLocation(axisObj.axisid, index == 0 ? false : index == 1 ? null : true, true);
+        });
+    this.loc.setDeselectAction(function (index, button) {
+            button.setColor(0x00ffff);
+        });
+    
     this.entry.add(this.axisname);
     this.entry.add(this.streams);
     this.entry.add(this.units);
     this.remove.addToObject(this.entry);
+    this.loc.addToObject(this.entry);
 }
 
 AxisTableEntry.prototype.TEXTHEIGHT = 0.1;
 AxisTableEntry.prototype.TEXTSIZE = 5;
 AxisTableEntry.prototype.STREAMX = 10;
-AxisTableEntry.prototype.UNITX = 150;
+AxisTableEntry.prototype.UNITX = 135;
 AxisTableEntry.prototype.LINEHEIGHT = 7;
 AxisTableEntry.prototype.BUTTONHEIGHT = 6;
-AxisTableEntry.prototype.BUTTONX = 180;
+AxisTableEntry.prototype.BUTTONX = 155;
+AxisTableEntry.prototype.LOCBUTTONWIDTH = 8;
 
 AxisTableEntry.prototype.addStream = function (stream) {
         var newrow = new AxisTableStream(stream, this, this.plotter);
@@ -177,8 +199,8 @@ function AxisTableStream(streamObj, axisEntry, plotter) {
     this.startPos = new THREE.Vector3();
 }
 
-AxisTableStream.prototype.THRESHPATHLEN = 40;
-AxisTableStream.prototype.MAXPATHLEN = 50;
+AxisTableStream.prototype.THRESHPATHLEN = 30;
+AxisTableStream.prototype.MAXPATHLEN = 40;
 AxisTableStream.prototype.TEXTHEIGHT = 0.1;
 AxisTableStream.prototype.TEXTSIZE = 5;
 AxisTableStream.prototype.LINEHEIGHT = 7;

@@ -104,7 +104,7 @@ AxisTableEntry.prototype.BUTTONHEIGHT = 6;
 AxisTableEntry.prototype.BUTTONX = 180;
 
 AxisTableEntry.prototype.addStream = function (stream) {
-        var newrow = new AxisTableStream(stream, this.plotter);
+        var newrow = new AxisTableStream(stream, this, this.plotter);
         newrow.index = this.currStreams.length;
         this.currStreams.push(newrow);
         this.streamMap[stream.uuid] = newrow;
@@ -121,7 +121,7 @@ AxisTableEntry.prototype.rmStream = function (uuid) {
             futRow = this.currStreams[i];
             this.currStreams[i - 1] = futRow;
             futRow.index--;
-            futRow.translateY(row.height);
+            futRow.streamRow.translateY(row.height);
         }
         this.currStreams.pop(); // reduce the length of the array by 1
         this.totalStreamHeight -= row.height;
@@ -160,7 +160,9 @@ AxisTableEntry.prototype.dispose = function () {
     };
     
     
-function AxisTableStream(streamObj, plotter) {
+function AxisTableStream(streamObj, axisEntry, plotter) {
+    this.axisEntry = axisEntry;
+    
     this.stream = streamObj;
     
     // Contains each row of the path as a separate child object
@@ -256,6 +258,7 @@ AxisTableStream.prototype.dispose = function () {
             for (i = 0; i < this.plotter.draggables.length; i++) {
                 if (this.plotter.draggables[i] == textentry) {
                     this.plotter.draggables.splice(i, 1);
+                    break;
                 }
             }
         }
@@ -267,7 +270,25 @@ AxisTableStream.prototype.startDrag = function () {
     };
     
 AxisTableStream.prototype.stopDrag = function () {
-        this.streamRow.position.copy(this.startPos);
+        var y = this.streamRow.position.y + (this.height / 2) + this.axisEntry.entry.position.y;
+        // y is the y coordinate of the middle of the stream row, relative to the origin (top left corner) of the axis table
+        var table = this.plotter.plotterUI.axisTable;
+        var assignedAxis = undefined;
+        for (var i = 0; i < table.currAxes.length; i++) {
+            if (y > 0) {
+                assignedAxis = table.currAxes[i - 1];
+                break;
+            }
+            y += table.currAxes[i].getHeight();
+        }
+        if (y > 0) {
+            assignedAxis = table.currAxes[i - 1];
+        }
+        if (assignedAxis == undefined || assignedAxis == this.axisEntry) {
+            this.streamRow.position.copy(this.startPos);
+        } else {
+            this.plotter.mvStream(this.stream.uuid, assignedAxis.axis.axisid);
+        }
     };
     
 AxisTableStream.prototype.drag = function (x, y) {

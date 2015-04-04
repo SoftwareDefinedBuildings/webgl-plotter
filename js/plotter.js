@@ -191,6 +191,21 @@ Plotter.prototype.addStream = function (stream) {
         return setting;
     };
     
+Plotter.prototype.mvStream = function (uuid, axisid) {
+        var fromid = this.settings.settingMap[uuid].axisid;
+        var stream = this.settings.mvStream(uuid, axisid);
+        
+        var table = this.plotterUI.axisTable;
+        var fromEntry = table.axisMap[fromid];
+        var toEntry = table.axisMap[axisid];
+        toEntry.addStream(stream);
+        fromEntry.rmStream(uuid);
+        toEntry.updateUnits();
+        fromEntry.updateUnits();
+        table.updateHeight(axisid);
+        table.updateHeight(fromid);
+    };
+    
 Plotter.prototype.rmAxis = function (axisid) {
         var self = this;
         var affectedEntries = [];

@@ -40,20 +40,21 @@ StreamAxis.prototype.addStream = function (stream) {
         } else {
             this.units[unit] = 1;
         }
-        this.streamMap[stream.uuid] = this.axisid;
     };
     
 StreamAxis.prototype.rmStream = function (uuid) {
-        var listnode = this.streamMap[stream.uuid];
-        delete this.streamMap[stream.uuid];
+        var listnode = this.streamMap[uuid];
+        delete this.streamMap[uuid];
         var unit = listnode.elem.Properties.UnitofMeasure;
-        this.units[unit]--;
+        if ((--this.units[unit]) == 0) {
+            delete this.units[unit];
+        }
         this.streams.removeNode(listnode);
     };
 
 function Settings() {
     this.streams = new LinkedList(); // a list of stream metadata objects
-    this.streamMap = {}; // maps UUID of a stream to an object containing its metadata
+    this.streamMap = {}; // maps UUID of a stream to a node in a linked list with an object containing its metadata
     this.settingMap = {}; // maps UUID of a stream to an object containing its settings
     this.axes = new LinkedList(); // a list of axes
     this.axisMap = {}; // maps the id of an axis to the node in the linked list containing the axis object
@@ -62,7 +63,7 @@ function Settings() {
 
 Settings.prototype.addStream = function (metadata, color) {
         // Update this Settings' internal data structures
-        this.streamMap[metadata.uuid] = this.streams.push(metadata);;
+        this.streamMap[metadata.uuid] = this.streams.push(metadata);
         var setting = new StreamSettings();
         this.settingMap[metadata.uuid] = setting;
         
@@ -90,6 +91,17 @@ Settings.prototype.addStream = function (metadata, color) {
     
 Settings.prototype.getSettings = function (uuid) {
         return this.settingMap[uuid];
+    };
+    
+Settings.prototype.mvStream = function (uuid, axisid) {
+        var stream = this.streamMap[uuid].elem;
+        var settings = this.settingMap[uuid];
+        var fromAxis = this.axisMap[settings.axisid].elem;
+        var toAxis = this.axisMap[axisid].elem;
+        fromAxis.rmStream(uuid);
+        toAxis.addStream(stream);
+        settings.axisid = axisid;
+        return stream;
     };
     
 Settings.prototype.rmStream = function (uuid) {

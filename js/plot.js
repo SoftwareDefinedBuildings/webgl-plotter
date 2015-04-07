@@ -1022,6 +1022,7 @@ Plot.prototype.scrollPlot = function (amount) {
     
 Plot.prototype.startResizePlot = function () {
         this.resizingPlot = true;
+        this.recomputePixelsWideIfNecessary();
     };
     
 Plot.prototype.stopResizePlot = function () {

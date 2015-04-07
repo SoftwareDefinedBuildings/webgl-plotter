@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,7 +110,7 @@ func (cw *ConnWrapper) GetWriter() io.Writer {
 }
 
 /** DataRequester encapsulates a series of connections used for obtaining data
-    from QUASAR. */
+	from QUASAR. */
 type DataRequester struct {
 	connections []net.Conn
 	sendLocks []*sync.Mutex
@@ -125,10 +126,10 @@ type DataRequester struct {
 }
 
 /** Creates a new DataRequester object.
-    dbAddr - the address of the database from where to obtain data.
-    numConnections - the number of connections to use.
-    maxPending - a limit on the maximum number of pending requests.
-    bracket - whether or not the new DataRequester will be used for bracket calls. */
+	dbAddr - the address of the database from where to obtain data.
+	numConnections - the number of connections to use.
+	maxPending - a limit on the maximum number of pending requests.
+	bracket - whether or not the new DataRequester will be used for bracket calls. */
 func NewDataRequester(dbAddr string, numConnections int, maxPending uint32, bracket bool) *DataRequester {
 	var connections []net.Conn = make([]net.Conn, numConnections)
 	var locks []*sync.Mutex = make([]*sync.Mutex, numConnections)
@@ -227,11 +228,11 @@ func (dr *DataRequester) MakeDataRequest(uuidBytes uuid.UUID, startTime int64, e
 }
 
 /** A function designed to handle QUASAR's response over Cap'n Proto.
-    You shouldn't ever have to invoke this function. It is used internally by
-    the constructor function. */
+	You shouldn't ever have to invoke this function. It is used internally by
+	the constructor function. */
 func (dr *DataRequester) handleDataResponse(connection net.Conn) {
 	for dr.alive {
-	    // Only one goroutine will be reading at a time, so a lock isn't needed
+		// Only one goroutine will be reading at a time, so a lock isn't needed
 		responseSegment, respErr := capnp.ReadFromStream(connection, nil)
 		
 		if respErr != nil {
@@ -259,7 +260,7 @@ func (dr *DataRequester) handleDataResponse(connection net.Conn) {
 		
 		length := records.Len()
 		if length == 0 {
-		    w.Write([]byte("[]"))
+			w.Write([]byte("[]"))
 		} else {
 			w.Write([]byte("["))
 			for i := 0; i < length; i++ {
@@ -268,7 +269,7 @@ func (dr *DataRequester) handleDataResponse(connection net.Conn) {
 				if i < length - 1 {
 					w.Write([]byte(fmt.Sprintf("[%v,%v,%v,%v,%v,%v],", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
 				} else {
-				    w.Write([]byte(fmt.Sprintf("[%v,%v,%v,%v,%v,%v]]", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
+					w.Write([]byte(fmt.Sprintf("[%v,%v,%v,%v,%v,%v]]", millis, nanos, record.Min(), record.Mean(), record.Max(), record.Count())))
 				}
 			}
 		}
@@ -371,7 +372,7 @@ func (dr *DataRequester) MakeBracketRequest(uuids []uuid.UUID, writ Writable) {
 	bracketPool.Put(mp)
 	
 	for i = 0; i < numResponses; i++ {
-	    <- responseChan
+		<- responseChan
 	}
 	
 	var (
@@ -404,11 +405,11 @@ func (dr *DataRequester) MakeBracketRequest(uuids []uuid.UUID, writ Writable) {
 }
 
 /** A function designed to handle QUASAR's response over Cap'n Proto.
-    You shouldn't ever have to invoke this function. It is used internally by
-    the constructor function. */
+	You shouldn't ever have to invoke this function. It is used internally by
+	the constructor function. */
 func (dr *DataRequester) handleBracketResponse(connection net.Conn) {
 	for dr.alive {
-	    // Only one goroutine will be reading at a time, so a lock isn't needed
+		// Only one goroutine will be reading at a time, so a lock isn't needed
 		responseSegment, respErr := capnp.ReadFromStream(connection, nil)
 		
 		if respErr != nil {
@@ -456,7 +457,7 @@ func parseDataRequest(request string, writ Writable) (uuidBytes uuid.UUID, start
 	}
 	
 	if len(args) == 5 {
-	    extra = args[4]
+		extra = args[4]
 	}
 
 	uuidBytes = uuid.Parse(args[0])
@@ -543,31 +544,69 @@ func main() {
 	}
 	
 	config, isErr := cparse.ParseConfig(string(configfile))
-    if isErr {
-        fmt.Println("There were errors while parsing plotter.ini. See above.")
-        return
-    }
-    
-    port, ok := config["port"]
-	if !ok {
-	    fmt.Println("Configuration file is missing required key \"port\"")
-	    return
-	}
-    
-    dbaddr, ok := config["db_addr"]
-    if !ok {
-        fmt.Println("Configuration file is missing required key \"db_addr\"")
-        return
-    }
-    
-	directory, ok := config["plotter_dir"]
-	if !ok {
-	    fmt.Println("Configuration file is missing required key \"plotter_dir\"")
-	    return
+	if isErr {
+		fmt.Println("There were errors while parsing plotter.ini. See above.")
+		return
 	}
 	
-	var dr *DataRequester = NewDataRequester(dbaddr.(string), 2, 8, false)
-	var br *DataRequester = NewDataRequester(dbaddr.(string), 2, 8, true)
+	port, ok := config["port"]
+	if !ok {
+		fmt.Println("Configuration file is missing required key \"port\"")
+		return
+	}
+	
+	dbaddr, ok := config["db_addr"]
+	if !ok {
+		fmt.Println("Configuration file is missing required key \"db_addr\"")
+		return
+	}
+	
+	dataConnRaw, ok := config["num_data_conn"]
+	if !ok {
+		fmt.Println("Configuration file is missing required key \"num_data_conn\"")
+		return
+	}
+	
+	bracketConnRaw, ok := config["num_bracket_conn"]
+	if !ok {
+		fmt.Println("Configuration file is missing required key \"num_data_conn\"")
+		return
+	}
+	
+	directory, ok := config["plotter_dir"]
+	if !ok {
+		fmt.Println("Configuration file is missing required key \"plotter_dir\"")
+		return
+	}
+	
+	mdServerRaw, ok := config["metadata_server"]
+	if !ok {
+		fmt.Println("Configuration file is missing required key \"metadata_server\"")
+		return
+	}
+	
+	dataConn64, err := strconv.ParseInt(dataConnRaw.(string), 0, 64)
+	if err != nil {
+		fmt.Println("Configuration file must specify num_data_conn as an int")
+		return
+	}
+	bracketConn64, err := strconv.ParseInt(bracketConnRaw.(string), 0, 64)
+	if err != nil {
+		fmt.Println("Configuration file must specify num_bracket_conn as an int")
+		return
+	}
+	var dataConn int = int(dataConn64)
+	var bracketConn int = int(bracketConn64)
+	var mdServer string = mdServerRaw.(string)
+	
+	var dr *DataRequester = NewDataRequester(dbaddr.(string), dataConn, 8, false)
+	if dr == nil {
+		os.Exit(1)
+	}
+	var br *DataRequester = NewDataRequester(dbaddr.(string), bracketConn, 8, true)
+	if br == nil {
+		os.Exit(1)
+	}
 	
 	http.Handle("/", http.FileServer(http.Dir(directory.(string))))
 	http.HandleFunc("/dataws", func (w http.ResponseWriter, r *http.Request) {
@@ -601,11 +640,11 @@ func main() {
 			
 			writer, err := websocket.NextWriter(ws.TextMessage)
 			if err != nil {
-			    fmt.Println("Could not echo tag to client")
+				fmt.Println("Could not echo tag to client")
 			}
 			
 			if cw.CurrWriter != nil {
-			    _, err = writer.Write([]byte(echoTag))
+				_, err = writer.Write([]byte(echoTag))
 				if err != nil {
 					fmt.Println("Could not echo tag to client")
 				}
@@ -617,6 +656,8 @@ func main() {
 	})
 	http.HandleFunc("/data", func (w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
+			w.Header().Set("Allow", "POST")
+			w.WriteHeader(http.StatusMethodNotAllowed)
 			w.Write([]byte("You must send a POST request to get data."))
 			return
 		}
@@ -636,7 +677,7 @@ func main() {
 		}
 	})
 	http.HandleFunc("/bracketws", func (w http.ResponseWriter, r *http.Request) {
-	    websocket, upgradeerr := upgrader.Upgrade(w, r, nil)
+		websocket, upgradeerr := upgrader.Upgrade(w, r, nil)
 		if upgradeerr != nil {
 			// TODO Perhaps we could redirect somehow?
 			w.Write([]byte(fmt.Sprintf("Could not upgrade HTTP connection to WebSocket: %v\n", upgradeerr)))
@@ -666,11 +707,11 @@ func main() {
 			
 			writer, err := websocket.NextWriter(ws.TextMessage)
 			if err != nil {
-			    fmt.Println("Could not echo tag to client")
+				fmt.Println("Could not echo tag to client")
 			}
 			
 			if cw.CurrWriter != nil {
-			    _, err = writer.Write([]byte(echoTag))
+				_, err = writer.Write([]byte(echoTag))
 				if err != nil {
 					fmt.Println("Could not echo tag to client")
 				}
@@ -682,6 +723,8 @@ func main() {
 	})
 	http.HandleFunc("/bracket", func (w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
+			w.Header().Set("Allow", "POST")
+			w.WriteHeader(http.StatusMethodNotAllowed)
 			w.Write([]byte("You must send a POST request to get data."))
 			return
 		}
@@ -699,6 +742,40 @@ func main() {
 		if success {
 			br.MakeBracketRequest(uuids, wrapper)
 		}
+	})
+	http.HandleFunc("/metadata", func (w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.Header().Set("Allow", "POST")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte("You must send a POST request to get data."))
+			return
+		}
+		
+		request, err := ioutil.ReadAll(r.Body) // should probably limit the size of this
+		
+		mdReq, err := http.NewRequest("POST", mdServer, strings.NewReader(string(request)))
+		mdReq.Header.Set("Content-Type", "text")
+		mdReq.Header.Set("Content-Length", fmt.Sprintf("%v", len(request)))
+		resp, err := http.DefaultClient.Do(mdReq)
+		
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(fmt.Sprintf("Could not forward request to metadata server: %v", err)))
+			return
+		}
+		
+		var buffer []byte = make([]byte, 1024) // forward the response in 1 KiB chunks
+		
+		var bytesRead int
+		var readErr error = nil
+		for readErr == nil {
+			bytesRead, readErr = resp.Body.Read(buffer)
+			if readErr != nil {
+				buffer = buffer[:bytesRead]
+			}
+			w.Write(buffer)
+		}
+		resp.Body.Close()
 	})
 	
 	var portStr string = fmt.Sprintf(":%v", port)

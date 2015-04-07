@@ -27,6 +27,8 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
     this.tickObjs = [];
     
     this.plotter = undefined;
+    
+    this.right = false; // true means it's on the right side, false means it's on the left side, null means it's hidden
 }
 
 Axis.prototype.rangeLo = 0;
@@ -37,8 +39,13 @@ Axis.prototype.TICKLENGTH = 2;
 Axis.prototype.AXISZ = 0.01;
 Axis.prototype.MINTICKS = 4;
 Axis.prototype.MAXTICKS = 8;
+Axis.prototype.LABELGAP = 1;
 
 Axis.prototype.tgp = new TickGeomPool(100); // Prune more often to conserve memory
+
+Axis.prototype.setRight = function (right) {
+        this.right = right;
+    };
 
 Axis.prototype.map = function (x) {
         return this.rangeLo + ((x - this.domainLo) / (this.domainHi - this.domainLo)) * (this.rangeHi - this.rangeLo);
@@ -66,7 +73,7 @@ Axis.prototype.setRange = function (rangeLo, rangeHi) {
     };
     
 Axis.prototype.addToPlotter = function (plotter) {
-        if (this.plotter == undefined) {
+        if (this.plotter === undefined) {
             plotter.scene.add(this.obj);
             this.plotter = plotter;
         }
@@ -82,19 +89,21 @@ Axis.prototype.updateX = function (x) {
         this.x = x;
     };
     
-Axis.prototype.removeFromPlotter = function (plotter) {
+Axis.prototype.removeFromPlotter = function () {
         plotter.scene.remove(this.obj);
+        this.plotter = undefined;
     };
     
 Axis.prototype.updateTicks = function () {
         var ticks = this.getTicks();
         var coord, geom, obj, textobj;
         var i;
+        var maxLabelWidth = -Infinity;
         for (i = 0; i < ticks.length; i++) {
             coord = this.map(ticks[i][0]);
             if (i < this.tickObjs.length) {
                 obj = this.tickObjs[i];
-                obj.translateY(coord - obj.userData.coord);
+                obj.position.setY(coord);
                 obj.userData.coord = coord;
                 this.tgp.putLabel(obj.children[1]);
                 obj.remove(obj.children[1]);
@@ -109,10 +118,20 @@ Axis.prototype.updateTicks = function () {
                 obj.add(new THREE.Mesh(geom, new THREE.MeshBasicMaterial({color: 0x000000})));
                 this.tickObjs.push(obj);
                 this.obj.add(obj);
-                obj.translateY(coord);
-                obj.userData.coord = coord;
+                obj.position.setY(coord);
             }
             textobj = this.tgp.getLabel(ticks[i][1]);
+            var bbox = textobj.geometry.boundingBox;
+            var width = bbox.max.x - bbox.min.x;
+            maxLabelWidth = Math.max(width, maxLabelWidth);
+            if (this.right) {
+                obj.position.setX(0);
+                textobj.position.setX(this.TICKLENGTH + this.LABELGAP);
+            } else {
+                obj.position.setX(-this.TICKLENGTH);
+                textobj.position.setX(-width - this.LABELGAP);
+            }
+            textobj.position.setY((bbox.min.y - bbox.max.y) / 2);
             obj.add(textobj);
         }
         for (var j = this.tickObjs.length - 1; j >= i; j--) {
@@ -121,6 +140,7 @@ Axis.prototype.updateTicks = function () {
             obj.children[0].geometry.dispose();
             this.tgp.putLabel(obj.children[1]);
         }
+        this.width = this.THICKNESS / 2 + this.TICKLENGTH + this.LABELGAP + maxLabelWidth;
     };
     
 /** Returns an array of tick values. Don't pass this method any arguments if called externally. */
@@ -221,6 +241,7 @@ TimeAxis.prototype.MAXMONTHTICK = 6;
 
 TimeAxis.prototype.TICKLENGTH = 2; // the length of each tick in virtual coordinates
 TimeAxis.prototype.TICKLABELSIZE = 3;
+TimeAxis.prototype.LABELGAP = 1;
 
 TimeAxis.prototype.tgp = new TickGeomPool(1000); // prune less often for better performance
 
@@ -276,25 +297,26 @@ TimeAxis.prototype.updateTicks = function () {
             coord = this.map(ticks[i].time);
             if (i < this.tickObjs.length) {
                 obj = this.tickObjs[i];
-                obj.translateX(coord - obj.userData.coord);
-                obj.userData.coord = coord;
+                obj.position.setX(coord);
                 this.tgp.putLabel(obj.children[1]);
                 obj.remove(obj.children[1]);
             } else {
                 geom = new THREE.Geometry();
-                geom.vertices.push(new THREE.Vector3(-this.THICKNESS, this.TICKLENGTH, this.AXISZ),
-                    new THREE.Vector3(-this.THICKNESS, 0, this.AXISZ),
-                    new THREE.Vector3(this.THICKNESS, 0, this.AXISZ),
-                    new THREE.Vector3(this.THICKNESS, this.TICKLENGTH, this.AXISZ));
+                geom.vertices.push(new THREE.Vector3(-this.THICKNESS, 0, this.AXISZ),
+                    new THREE.Vector3(-this.THICKNESS, -this.TICKLENGTH, this.AXISZ),
+                    new THREE.Vector3(this.THICKNESS, -this.TICKLENGTH, this.AXISZ),
+                    new THREE.Vector3(this.THICKNESS, 0, this.AXISZ));
                 geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
                 obj = new THREE.Object3D();
                 obj.add(new THREE.Mesh(geom, new THREE.MeshBasicMaterial({color: 0x000000})));
                 this.tickObjs.push(obj);
                 this.obj.add(obj);
-                obj.translateX(coord);
-                obj.userData.coord = coord;
+                obj.position.setX(coord);
             }
             textobj = this.tgp.getLabel(ticks[i].getLabel(this.translator));
+            var bbox = textobj.geometry.boundingBox;
+            textobj.position.setX((bbox.min.x - bbox.max.x) / 2);
+            textobj.position.setY((bbox.min.y - bbox.max.y) - this.TICKLENGTH - this.LABELGAP);
             obj.add(textobj);
         }
         for (var j = this.tickObjs.length - 1; j >= i; j--) {
@@ -461,8 +483,7 @@ TickGeomPool.prototype.getLabel = function (label) {
         } else {
             var textgeom = new THREE.TextGeometry(label, {size: this.TICKLABELSIZE, height: this.AXISZ});
             var textobj = new THREE.Mesh(textgeom, new THREE.MeshBasicMaterial({color: 0x000000}));
-            textobj.translateX(this.THICKNESS * 2);
-            textobj.translateY(this.THICKNESS * 2);
+            textgeom.computeBoundingBox();
             textobj.userData.label = label;
             return textobj;
         }

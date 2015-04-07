@@ -19,9 +19,9 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.x = x;
     this.y = y;
     
-    this.plotmargin = {left: 20, right: 20, top: 20, bottom: 20};
+    this.plotmargin = {left: 20, right: 20, top: 20, bottom: 25};
     this.ddplotmargin = {top: 2, bottom: 2}; // left and right are shared with plot margin, since these will always be aligned
-    this.wvplotmargin = {top: 2, bottom: 2, left: 2, right: 2}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
+    this.wvplotmargin = {top: 7, bottom: 7, left: 2, right: 2}; // top is gap from plot, bottom is gap from bottom (after outermargin is applied)
     
     // draw the chart area
     this.plotbgGeom = new THREE.Geometry()
@@ -701,12 +701,16 @@ Plot.prototype.drawGraph2 = function () {
         
         var newAxes = {};
         
+        var widthSoFar = [0, 0];
+        var wsfIndex;
+        
         for (axisnode = axes.head; axisnode != null; axisnode = axisnode.next) {
             axis = axisnode.elem;
+            wsfIndex = axis.right ? 1 : 0;
             maxval = -Infinity;
             minval = Infinity;
             if (axis.autoscale) {
-                for (streamnode = axis.streams.head; streamnode != null; streamnode = streamnode.next) {
+                for (streamnode = axis.streams.head; streamnode !== null; streamnode = streamnode.next) {
                     stream = streamnode.elem;
                     if (this.drawingCache.hasOwnProperty(stream.uuid)) {
                         data  = this.drawingCache[stream.uuid].cached_data;
@@ -722,7 +726,6 @@ Plot.prototype.drawGraph2 = function () {
                         }
                     }
                 }
-                newAxes[axis.axisid] = axis;
                 if (maxval < minval) {
                     axis.setDomain(-10, 10);
                 } else if (maxval == minval) {
@@ -731,18 +734,30 @@ Plot.prototype.drawGraph2 = function () {
                     axis.setDomain(minval, maxval);
                 }
                 axis.niceDomain();
-                axis.updateX(this.x + this.outermargin + this.wvplotmargin.left + this.AXISWIDTH * (++leftaxisnum));
+            }
+            if (axis.right == null) {
+                continue;
+            }
+            newAxes[axis.axisid] = axis;
+            axis.updateTicks();
+            widthSoFar[wsfIndex] += (axis.width + 1);
+            if (axis.right) {
+                axis.updateX(this.x + this.w - this.outermargin - this.wvplotmargin.right - widthSoFar[1]);
+            } else {
+                axis.updateX(this.x + this.outermargin + this.wvplotmargin.left + widthSoFar[0]);
+            }
+            if (!this.currAxes.hasOwnProperty(axis.axisid)) {
                 axis.addToPlotter(this.plotter);
             }
         }
         
-        var newX = this.AXISWIDTH * leftaxisnum + this.wvplotmargin.left;
-        var newW = this.w - newX - this.wvplotmargin.right - this.AXISWIDTH * rightaxisnum;
+        var newX = this.wvplotmargin.left + widthSoFar[0];
+        var newW = this.w - newX - this.wvplotmargin.right - this.AXISWIDTH * rightaxisnum - widthSoFar[1];
         this.setPlot(newX, undefined, newW, undefined);
         
         for (var id in this.currAxes) {
             if (this.currAxes.hasOwnProperty(id) && !newAxes.hasOwnProperty(id)) {
-                this.currAxes[id].removeFromPlotter(this.plotter);
+                this.currAxes[id].removeFromPlotter();
             }
         }
         

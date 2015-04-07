@@ -24,7 +24,6 @@ function StreamAxis(id, domainLo, domainHi, rangeLo, rangeHi) {
     this.streamMap = {}; // maps uuid of a stream to its node in the Linked List
     this.units = {};
     this.autoscale = true;
-    this.right = false; // true means it's on the right side, false means it's on the left side, null means it's hidden
 }
 StreamAxis.prototype = Object.create(Axis.prototype); // extends Axis
 

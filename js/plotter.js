@@ -3,7 +3,6 @@ function Plotter() {
     this.renderer = new THREE.WebGLRenderer({antialias: true});
     this.camera = new THREE.PerspectiveCamera(90, this.width / this.height, 1, 1000);
     this.camera.position.z = 100;
-    this.scene.add(this.camera);
     this.canvas = this.renderer.domElement;
     this.hToW = 1;
     this.clickables = [];
@@ -116,6 +115,15 @@ function Plotter() {
                 event.preventDefault();
             }
         }, false);
+        
+    this.container = document.createElement("div");
+    this.container.style.position = "relative";
+    this.canvas.style.position = "absolute";
+    this.canvas.style.top = "0px";
+    this.canvas.style["z-index"] = 0;
+    this.container.appendChild(this.canvas);
+    this.htmlelems = document.createElement("div");
+    this.container.appendChild(this.htmlelems);
     
     // all requests for external resources are done through the Requester
     //this.requester = new Requester('http://miranda.cs.berkeley.edu:4524/', 'http://miranda.cs.berkeley.edu:9000/data/uuid/');
@@ -156,7 +164,23 @@ function Plotter() {
 }
 
 Plotter.prototype.addToElement = function (domElem) {
-        domElem.appendChild(this.canvas);
+        domElem.appendChild(this.container);
+    };
+    
+Plotter.prototype.addHTMLElem = function (elem, name) {
+        elem.style["z-index"] = 1;
+        this.htmlelems.appendChild(elem);
+    };
+    
+Plotter.prototype.removeHTMLElem = function (elem) {
+        this.htmlelems.removeChild(elem);
+    };
+    
+Plotter.prototype.updateHTMLElems = function () {
+        var node;
+        for (node = this.htmlelems.firstChild; node !== null; node = node.nextSibling) {
+            node.update();
+        }
     };
 
 /** The PLOT button. */
@@ -254,6 +278,7 @@ Plotter.prototype.updateScreenSize = function () {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(this.width, this.height);
         this.plot.pixelsWideChanged();
+        this.updateHTMLElems();
     };
     
 Plotter.prototype.getMouseRay = function (mouseEvent) {

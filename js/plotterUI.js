@@ -31,7 +31,7 @@ function PlotterUI(plotter, x, y) {
     this.addAxisButton = addAxisButton;
     
     // The Axis Table
-    var axisTable = new AxisTable(10, -40, 0, plotter);
+    var axisTable = new AxisTable(0, -40, 0, plotter);
     axisTable.addToObject(this.plotterUI);
     this.axisTable = axisTable;
     

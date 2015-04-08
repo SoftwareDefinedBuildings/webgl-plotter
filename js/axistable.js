@@ -31,7 +31,7 @@ AxisTable.prototype.addAxis = function (axisObj) {
         newentry.measuredHeight = newentry.getHeight();
         this.totalEntryHeight += newentry.measuredHeight;
         newentry.entry.position.setY(-this.totalEntryHeight);
-        this.obj.add(newentry.entry);
+        newentry.addToObject(this.obj);
         return newentry;
     };
     
@@ -114,17 +114,43 @@ function AxisTableEntry(axisObj, plotter) {
     this.entry.add(this.units);
     this.remove.addToObject(this.entry);
     this.loc.addToObject(this.entry);
+    
+    var self = this;
+    var ninput = document.createElement("input");
+    ninput.style.position = "absolute";
+    ninput.update = function () {
+            self.entry.parent.parent.parent.updateMatrixWorld(true);
+            self.entry.parent.parent.updateMatrixWorld(true);
+            self.entry.parent.updateMatrixWorld(true);
+            self.entry.updateMatrixWorld(true);
+            var ratio = self.plotter.width / self.plotter.VIRTUAL_WIDTH;
+            var nameinputposition = new THREE.Vector3(self.NAMEX, self.TEXTSIZE, 0);
+            var globalnamepos = self.entry.localToWorld(nameinputposition);
+            var screenpos = globalnamepos.project(plotter.camera);
+            ninput.style.top = (-screenpos.y + 1) * plotter.height / 2;
+            ninput.style.left = (screenpos.x + 1) * plotter.width / 2;
+            ninput.style.width = (self.STREAMX - self.NAMEX - 2) * ratio;
+            ninput.style["font-size"] = (self.TEXTSIZE - 1) * ratio;
+        };
+    this.ninput = ninput;
 }
 
 AxisTableEntry.prototype.TEXTHEIGHT = 0.1;
 AxisTableEntry.prototype.TEXTSIZE = 5;
-AxisTableEntry.prototype.STREAMX = 10;
-AxisTableEntry.prototype.UNITX = 135;
+AxisTableEntry.prototype.STREAMX = 20;
+AxisTableEntry.prototype.UNITX = 140;
 AxisTableEntry.prototype.LINEHEIGHT = 7;
 AxisTableEntry.prototype.BUTTONHEIGHT = 6;
-AxisTableEntry.prototype.BUTTONX = 155;
+AxisTableEntry.prototype.BUTTONX = 160;
 AxisTableEntry.prototype.LOCBUTTONWIDTH = 8;
-AxisTableEntry.prototype.NAMEX = 1;
+AxisTableEntry.prototype.NAMEX = 0;
+AxisTableEntry.prototype.NAMEWIDTH = 7;
+
+AxisTableEntry.prototype.addToObject = function (obj) {
+        obj.add(this.entry);
+        this.plotter.addHTMLElem(this.ninput);
+        this.ninput.update();
+    };
 
 AxisTableEntry.prototype.addStream = function (stream) {
         var newrow = new AxisTableStream(stream, this, this.plotter);
@@ -175,6 +201,7 @@ AxisTableEntry.prototype.getHeight = function () {
     };
     
 AxisTableEntry.prototype.dispose = function () {
+        this.plotter.removeHTMLElem(this.ninput);
         for (var i = this.currStreams.length - 1; i >= 0; i--) {
             this.entry.remove(this.currStreams[i].streamRow);
             this.currStreams[i].dispose();

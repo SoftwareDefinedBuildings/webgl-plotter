@@ -124,6 +124,7 @@ AxisTableEntry.prototype.LINEHEIGHT = 7;
 AxisTableEntry.prototype.BUTTONHEIGHT = 6;
 AxisTableEntry.prototype.BUTTONX = 155;
 AxisTableEntry.prototype.LOCBUTTONWIDTH = 8;
+AxisTableEntry.prototype.NAMEX = 1;
 
 AxisTableEntry.prototype.addStream = function (stream) {
         var newrow = new AxisTableStream(stream, this, this.plotter);

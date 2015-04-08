@@ -1,7 +1,9 @@
 function Plotter() {
     this.scene = new THREE.Scene();
     this.renderer = new THREE.WebGLRenderer({antialias: true});
-    this.camera = undefined;
+    this.camera = new THREE.PerspectiveCamera(90, this.width / this.height, 1, 1000);
+    this.camera.position.z = 100;
+    this.scene.add(this.camera);
     this.canvas = this.renderer.domElement;
     this.hToW = 1;
     this.clickables = [];
@@ -153,6 +155,10 @@ function Plotter() {
     this.selectedEndTime = [1421676656000, 0];
 }
 
+Plotter.prototype.addToElement = function (domElem) {
+        domElem.appendChild(this.canvas);
+    };
+
 /** The PLOT button. */
 Plotter.prototype.plotData = function () {
         this.plot.plotData();
@@ -244,15 +250,10 @@ Plotter.prototype.updateScreenSize = function () {
         this.canvas.style.width = this.width;
         this.height = this.hToW * this.width;
         this.canvas.style.height = this.height;
-        this.camera = new THREE.PerspectiveCamera(90, this.width / this.height, 1, 1000);
-        this.camera.position.z = 100;
+        this.camera.aspect = this.width / this.height;
+        this.camera.updateProjectionMatrix();
         this.renderer.setSize(this.width, this.height);
-        
         this.plot.pixelsWideChanged();
-    };
-    
-Plotter.prototype.getCanvas = function () {
-        return this.canvas;
     };
     
 Plotter.prototype.getMouseRay = function (mouseEvent) {

@@ -56,8 +56,8 @@ Axis.prototype.unmap = function (y) {
     };
     
 Axis.prototype.setDomain = function (domainLo, domainHi) {
-        this.domainLo = domainLo;
-        this.domainHi = domainHi;
+        this.domainLo = domainLo || this.domainLo;
+        this.domainHi = domainHi || this.domainHi;
     };
     
 Axis.prototype.setRange = function (rangeLo, rangeHi) {
@@ -143,7 +143,7 @@ Axis.prototype.updateTicks = function () {
         this.width = this.THICKNESS / 2 + this.TICKLENGTH + this.LABELGAP + maxLabelWidth;
     };
     
-/** Returns an array of tick values. Don't pass this method any arguments if called externally. */
+/** Returns an array of tick values. */
 Axis.prototype.getTicks = function () {
         var precision = Math.round(Math.log(this.domainHi - this.domainLo) /  Math.LN10 - 1);
         var delta = Math.pow(10, precision);
@@ -153,16 +153,24 @@ Axis.prototype.getTicks = function () {
             delta *= 2;
         } else if (numTicks < this.MINTICKS) {
             delta /= 2;
-            precsion += 1;
+            precision += 1;
         }
         
         var low = Math.ceil(this.domainLo / delta) * delta;
         var ticks = [];
         
         precision = -precision;
-        while (low < this.domainHi) {
-            ticks.push([low, low.toFixed(precision)]);
-            low += delta;
+        if (precision >= 0) {
+            while (low < this.domainHi) {
+                ticks.push([low, low.toFixed(precision)]);
+                low += delta;
+            }
+        } else {
+            var power = Math.pow(10, precision);
+            while (low < this.domainHi) {
+                ticks.push([low, (Math.round(low / power) * power).toFixed(0)]);
+                low += delta;
+            }
         }
         
         return ticks;

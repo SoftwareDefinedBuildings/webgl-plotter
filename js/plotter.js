@@ -252,6 +252,20 @@ Plotter.prototype.rmAxis = function (axisid) {
         }
     };
     
+Plotter.prototype.autoscale = function (axisid) {
+        this.settings.getAxis(axisid).automaticScale();
+        this.plotterUI.axisTable.axisMap[axisid].setScaleUI("", "");
+    };
+    
+Plotter.prototype.setScale = function (axisid, low, high) {
+        this.settings.getAxis(axisid).setDomain(low, high);
+        this.plotterUI.axisTable.axisMap[axisid].setScaleUI(low, high);
+    };
+    
+Plotter.prototype.updateScaleUI = function (axis) {
+        this.plotterUI.axisTable.axisMap[axis.axisid].setScaleUI(axis.domainLo, axis.domainHi);
+    };
+    
 /** If suppressUIUpdate is set to true, then the UI will not be updated. */
 Plotter.prototype.setAxisLocation = function (axisid, right, suppressUIUpdate) {
         if (suppressUIUpdate) { // yes, skip if not suppressing UI update. The function will be called again when updating the UI so this will still happen.

@@ -23,12 +23,17 @@ function StreamAxis(id, domainLo, domainHi, rangeLo, rangeHi) {
     this.streams = new LinkedList(); // a linked list of streams
     this.streamMap = {}; // maps uuid of a stream to its node in the Linked List
     this.units = {};
-    this.autoscale = true;
+    this.autoscale = true; // autoscale this axis when next computing the axes
 }
 StreamAxis.prototype = Object.create(Axis.prototype); // extends Axis
 
-StreamAxis.prototype.autoscale = function () {
+StreamAxis.prototype.automaticScale = function () {
         this.autoscale = true;
+    };
+    
+StreamAxis.prototype.setDomain = function () { // overrides Axis.prototype.setDomain
+        Axis.prototype.setDomain.apply(this, arguments);
+        this.autoscale = false;
     };
     
 StreamAxis.prototype.addStream = function (stream) {

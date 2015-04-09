@@ -118,6 +118,9 @@ function AxisTableEntry(axisObj, plotter) {
         });
         
     this.autoscale = plotter.plotterUI.makeButton("A", this.TEXTSIZE, this.BUTTONHEIGHT, this.BUTTONHEIGHT, 0xffff00, 0x0000ff, 0x000000);
+    this.autoscale.setClickAction(function () {
+            plotter.autoscale(axisObj.axisid);
+        });
     this.autoscale.setPosition(this.AUTOSCALEX, 0);
     
     this.entry.add(this.axisname);
@@ -132,9 +135,15 @@ function AxisTableEntry(axisObj, plotter) {
     
     this.linput = document.createElement("input");
     this.linput.style.position = "absolute";
+    this.linput.onchange = function () {
+            plotter.setScale(axisObj.axisid, this.value);
+        };
     
     this.hinput = document.createElement("input");
     this.hinput.style.position = "absolute";
+    this.hinput.onchange = function () {
+            plotter.setScale(axisObj.axisid, undefined, this.value);
+        };
 }
 
 AxisTableEntry.prototype.TEXTHEIGHT = 0.1;
@@ -235,6 +244,15 @@ AxisTableEntry.prototype.updateHTMLPortion = function () {
         this.hinput.style.left = leftlinput + widthlinput + 1 * ratio;
         this.hinput.style.width = widthlinput;
         this.hinput.style["font-size"] = this.INPUTTEXTSIZE * ratio;
+    };
+    
+AxisTableEntry.prototype.setScaleUI = function (low, high) {
+        if (low != undefined) {
+            this.linput.value = low.toString();
+        }
+        if (high != undefined) {
+            this.hinput.value = high.toString();
+        }
     };
     
 AxisTableEntry.prototype.dispose = function () {

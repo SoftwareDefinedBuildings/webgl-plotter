@@ -734,6 +734,7 @@ Plot.prototype.drawGraph2 = function () {
                     axis.setDomain(minval, maxval);
                 }
                 axis.niceDomain();
+                this.plotter.updateScaleUI(axis);
             }
             if (axis.right == null) {
                 continue;

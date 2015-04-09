@@ -45,6 +45,10 @@ PlotterUI.prototype.setY = function (newY) {
         this.plotterUI.position.setY(newY);
     };
     
+PlotterUI.prototype.updateHTMLPortion = function () {
+        this.axisTable.updateHTMLPortion();
+    };
+    
 PlotterUI.prototype.makeButton = function (text, textsize, width, height, color, presscolor, textcolor) {
         var newButton = new Button(width, height, 0, color, this.plotter);
         newButton.addToObject(this.plotterUI);

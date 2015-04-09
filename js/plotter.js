@@ -175,13 +175,6 @@ Plotter.prototype.addHTMLElem = function (elem, name) {
 Plotter.prototype.removeHTMLElem = function (elem) {
         this.htmlelems.removeChild(elem);
     };
-    
-Plotter.prototype.updateHTMLElems = function () {
-        var node;
-        for (node = this.htmlelems.firstChild; node !== null; node = node.nextSibling) {
-            node.update();
-        }
-    };
 
 /** The PLOT button. */
 Plotter.prototype.plotData = function () {
@@ -278,7 +271,7 @@ Plotter.prototype.updateScreenSize = function () {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(this.width, this.height);
         this.plot.pixelsWideChanged();
-        this.updateHTMLElems();
+        this.plotterUI.updateHTMLPortion();
     };
     
 Plotter.prototype.getMouseRay = function (mouseEvent) {

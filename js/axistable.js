@@ -42,6 +42,7 @@ AxisTable.prototype.updateHeight = function (axisid) {
         entry.measuredHeight = newHeight;
         for (var i = entry.index + 1; i < this.currAxes.length; i++) {
             this.currAxes[i].entry.translateY(diff);
+            this.currAxes[i].updateHTMLPortion();
         }
         this.totalEntryHeight -= diff;
     };
@@ -57,6 +58,7 @@ AxisTable.prototype.rmAxis = function (axisid) {
             this.currAxes[i - 1] = futEntry;
             futEntry.index--;
             futEntry.entry.translateY(rmHeight);
+            futEntry.updateHTMLPortion();
         }
         this.currAxes.pop();
         this.totalEntryHeight -= rmHeight;
@@ -198,6 +200,10 @@ AxisTableEntry.prototype.updateUnits = function () {
     
 AxisTableEntry.prototype.getHeight = function () {
         return Math.max(this.LINEHEIGHT, this.totalStreamHeight);
+    };
+    
+AxisTableEntry.prototype.updateHTMLPortion = function () {
+        this.ninput.update();
     };
     
 AxisTableEntry.prototype.dispose = function () {

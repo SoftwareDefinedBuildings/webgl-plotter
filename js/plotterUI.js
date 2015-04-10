@@ -43,6 +43,7 @@ function PlotterUI(plotter, x, y) {
 PlotterUI.prototype.setY = function (newY) {
         this.y = newY;
         this.plotterUI.position.setY(newY);
+        this.updateHTMLPortion();
     };
     
 PlotterUI.prototype.updateHTMLPortion = function () {

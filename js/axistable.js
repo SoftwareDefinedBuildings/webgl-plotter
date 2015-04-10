@@ -139,13 +139,23 @@ function AxisTableEntry(axisObj, plotter) {
     this.linput = document.createElement("input");
     this.linput.style.position = "absolute";
     this.linput.onchange = function () {
-            plotter.setScale(axisObj.axisid, this.value);
+            var intVal = Number(this.value);
+            if (isFinite(intVal) && !isNaN(intVal)) {
+                plotter.setScale(axisObj.axisid, intVal);
+            } else {
+                this.value = axisObj.autoscale ? "" : axisObj.domainLo.toString();
+            }
         };
     
     this.hinput = document.createElement("input");
     this.hinput.style.position = "absolute";
     this.hinput.onchange = function () {
-            plotter.setScale(axisObj.axisid, undefined, this.value);
+            var intVal = Number(this.value);
+            if (isFinite(intVal) && !isNaN(intVal)) {
+                plotter.setScale(axisObj.axisid, undefined, intVal);
+            } else {
+                this.value = axisObj.autoscale ? "" : axisObj.domainHi.toString();
+            }
         };
 }
 

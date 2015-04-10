@@ -301,8 +301,8 @@ function AxisTableStream(streamObj, axisEntry, plotter) {
     this.startPos = new THREE.Vector3();
 }
 
-AxisTableStream.prototype.THRESHPATHLEN = 30;
-AxisTableStream.prototype.MAXPATHLEN = 40;
+AxisTableStream.prototype.THRESHPATHLEN = 22;
+AxisTableStream.prototype.MAXPATHLEN = 26;
 AxisTableStream.prototype.TEXTHEIGHT = 0.1;
 AxisTableStream.prototype.TEXTSIZE = 5;
 AxisTableStream.prototype.LINEHEIGHT = 7;
@@ -315,10 +315,10 @@ AxisTableStream.prototype.updatePath = function () {
         var pathlen = path.length;
         
         var rowlen = this.THRESHPATHLEN;
-        var numrows = Math.ceil(this.pathlength / this.THRESHPATHLEN)
+        var numrows = Math.ceil(pathlen / this.THRESHPATHLEN)
         var lastrowlen = pathlen % this.THRESHPATHLEN;
         if (lastrowlen < numrows * (this.MAXPATHLEN - this.THRESHPATHLEN)) {
-            rowlen += Math.ceil(lastrowlen / numrows);
+            rowlen += Math.ceil(lastrowlen * this.MAXPATHLEN / pathlen);
         }
         
         var rows = [];
@@ -347,9 +347,10 @@ AxisTableStream.prototype.updatePath = function () {
         
         this.height = rows.length * this.LINEHEIGHT;
         
-        var backheight = this.height + this.BACKHEIGHTOFFSET - this.BOTTOMLEFTEDGE;
+        var top = this.LINEHEIGHT + this.BACKHEIGHTOFFSET - this.BOTTOMLEFTEDGE;
+        var bottom = this.LINEHEIGHT - this.BOTTOMLEFTEDGE - this.height;
         var backgeom = new THREE.Geometry();
-        backgeom.vertices.push(new THREE.Vector3(-this.BOTTOMLEFTEDGE, -this.BOTTOMLEFTEDGE, 0), new THREE.Vector3(this.TEXTWIDTH, -this.BOTTOMLEFTEDGE, 0), new THREE.Vector3(this.TEXTWIDTH, backheight, 0), new THREE.Vector3(-this.BOTTOMLEFTEDGE, backheight, 0));
+        backgeom.vertices.push(new THREE.Vector3(-this.BOTTOMLEFTEDGE, bottom, 0), new THREE.Vector3(this.TEXTWIDTH, bottom, 0), new THREE.Vector3(this.TEXTWIDTH, top, 0), new THREE.Vector3(-this.BOTTOMLEFTEDGE, top, 0));
         backgeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
         textentry = new THREE.Mesh(backgeom, new THREE.MeshBasicMaterial({color: 0x888888}));
         
@@ -394,7 +395,7 @@ AxisTableStream.prototype.startDrag = function () {
     };
     
 AxisTableStream.prototype.stopDrag = function () {
-        var y = this.streamRow.position.y + (this.height / 2) + this.axisEntry.entry.position.y;
+        var y = this.streamRow.position.y + this.LINEHEIGHT - (this.height / 2) + this.axisEntry.entry.position.y;
         // y is the y coordinate of the middle of the stream row, relative to the origin (top left corner) of the axis table
         var table = this.plotter.plotterUI.axisTable;
         var assignedAxis = undefined;
@@ -419,5 +420,4 @@ AxisTableStream.prototype.drag = function (x, y) {
         this.streamRow.translateX(x * this.plotter.VIRTUAL_WIDTH / this.plotter.width);
         this.streamRow.translateY(-y * this.plotter.VIRTUAL_WIDTH / this.plotter.width);
     };
-
 

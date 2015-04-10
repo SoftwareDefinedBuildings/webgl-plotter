@@ -18,7 +18,6 @@ StreamSettings.prototype.deselect = function () {
     
 function StreamAxis(id, domainLo, domainHi, rangeLo, rangeHi) {
     Axis.call(this, domainLo || -1, domainHi || 1, rangeLo, rangeHi);
-    this.axisname = id;
     this.axisid = id;
     this.streams = new LinkedList(); // a linked list of streams
     this.streamMap = {}; // maps uuid of a stream to its node in the Linked List

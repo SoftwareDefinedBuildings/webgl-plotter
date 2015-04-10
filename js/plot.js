@@ -728,7 +728,7 @@ Plot.prototype.drawGraph2 = function () {
                 }
                 if (maxval < minval) {
                     axis.setDomain(-10, 10);
-                } else if (maxval == minval) {
+                } else if (maxval === minval) {
                     axis.setDomain(minval - 1, maxval + 1);
                 } else {
                     axis.setDomain(minval, maxval);
@@ -741,7 +741,7 @@ Plot.prototype.drawGraph2 = function () {
             }
             newAxes[axis.axisid] = axis;
             axis.updateTicks();
-            widthSoFar[wsfIndex] += (axis.width + 1);
+            widthSoFar[wsfIndex] += (axis.width + 2); // 2 is the gap between the axes
             if (axis.right) {
                 axis.updateX(this.x + this.w - this.outermargin - this.wvplotmargin.right - widthSoFar[1]);
             } else {

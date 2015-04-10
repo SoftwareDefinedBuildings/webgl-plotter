@@ -266,6 +266,11 @@ Plotter.prototype.updateScaleUI = function (axis) {
         this.plotterUI.axisTable.axisMap[axis.axisid].setScaleUI(axis.domainLo, axis.domainHi);
     };
     
+Plotter.prototype.renameAxis = function (axisid, newName) {
+        this.settings.getAxis(axisid).setName(newName);
+        this.plotterUI.axisTable.axisMap[axisid].setAxisNameUI(newName);
+    };
+    
 /** If suppressUIUpdate is set to true, then the UI will not be updated. */
 Plotter.prototype.setAxisLocation = function (axisid, right, suppressUIUpdate) {
         if (suppressUIUpdate) { // yes, skip if not suppressing UI update. The function will be called again when updating the UI so this will still happen.

@@ -20,6 +20,7 @@ function Axis (domainLo, domainHi, rangeLo, rangeHi, x) {
     this.geom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
     var material = new THREE.MeshBasicMaterial({color: 0x000000});
     var baseline = new THREE.Mesh(this.geom, material);
+    
     this.obj = new THREE.Object3D();
     this.obj.add(baseline);
     this.obj.translateX(x);
@@ -41,10 +42,52 @@ Axis.prototype.MINTICKS = 4;
 Axis.prototype.MAXTICKS = 8;
 Axis.prototype.LABELGAP = 1;
 
+Axis.prototype.NAMETEXTSIZE = 4;
+
 Axis.prototype.tgp = new TickGeomPool(100); // Prune more often to conserve memory
+
+Axis.prototype.setName = function (name) {
+        this.axisname = name;
+        
+        if (this.nameobj !== undefined) {
+            this.obj.remove(this.nameobj);
+            this.nameobj.geometry.dispose();
+            this.nameobj.material.dispose();
+        }
+        
+        this.namegeom = new THREE.TextGeometry(this.axisname, {size: this.NAMETEXTSIZE, height: this.AXISZ});
+        this.namegeom.computeBoundingBox();
+        this.nameobj = new THREE.Mesh(this.namegeom, new THREE.MeshBasicMaterial({color: 0x000000}));
+        this.nameobj.position.z = 0;
+        
+        this.updateNamePosition();
+        this.updateNameOrientation();
+        
+        this.obj.add(this.nameobj);
+    };
+    
+Axis.prototype.updateNamePosition = function () {
+        var bbox = this.namegeom.boundingBox;
+        var width = bbox.max.y - bbox.min.y;
+        var height = bbox.max.x - bbox.min.x;
+        this.nameobj.position.y = this.rangeLo + (this.rangeHi - this.rangeLo - height) / 2;
+    };
+    
+Axis.prototype.updateNameOrientation = function () {
+        if (this.right) {
+            this.nameobj.position.x = this.NAMETEXTSIZE + this.width;
+            this.nameobj.rotation.z = -Math.PI / 2;
+        } else {
+            this.nameobj.position.x = this.NAMETEXTSIZE - this.width;
+            this.nameobj.rotation.z = Math.PI / 2;
+        }
+    };
 
 Axis.prototype.setRight = function (right) {
         this.right = right;
+        if (this.hasOwnProperty("axisname")) {
+            this.updateNameOrientation();
+        }
     };
 
 Axis.prototype.map = function (x) {
@@ -70,6 +113,10 @@ Axis.prototype.setRange = function (rangeLo, rangeHi) {
         this.geom.vertices[2].y = this.rangeHi;
         this.geom.vertices[3].y = this.rangeLo;
         this.geom.verticesNeedUpdate = true;
+        
+        if (this.hasOwnProperty("axisname")) {
+            this.updateNamePosition();
+        }
     };
     
 Axis.prototype.addToPlotter = function (plotter) {
@@ -140,7 +187,7 @@ Axis.prototype.updateTicks = function () {
             obj.children[0].geometry.dispose();
             this.tgp.putLabel(obj.children[1]);
         }
-        this.width = this.THICKNESS / 2 + this.TICKLENGTH + this.LABELGAP + maxLabelWidth;
+        this.width = this.THICKNESS / 2 + this.TICKLENGTH + this.LABELGAP + maxLabelWidth + this.NAMETEXTSIZE + 2; // 2 is the gap between axis name and longest label
     };
     
 /** Returns an array of tick values. */

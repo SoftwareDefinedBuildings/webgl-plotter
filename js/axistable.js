@@ -132,6 +132,9 @@ function AxisTableEntry(axisObj, plotter) {
     
     this.ninput = document.createElement("input");
     this.ninput.style.position = "absolute";
+    this.ninput.onchange = function () {
+            plotter.renameAxis(axisObj.axisid, this.value);
+        };
     
     this.linput = document.createElement("input");
     this.linput.style.position = "absolute";
@@ -253,6 +256,10 @@ AxisTableEntry.prototype.setScaleUI = function (low, high) {
         if (high != undefined) {
             this.hinput.value = high.toString();
         }
+    };
+    
+AxisTableEntry.prototype.setAxisNameUI = function (newName) {
+        this.ninput.value = newName;
     };
     
 AxisTableEntry.prototype.dispose = function () {

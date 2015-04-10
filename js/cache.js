@@ -1004,13 +1004,12 @@ Cache.makeShaders = function () {
             uniforms: {
                 "affineMatrix": {type: 'm4'},
                 "color": {type: 'v3'},
-                "rot90Matrix": {type: 'm3'},
                 "thickness": {type: 'f'},
                 "yDomainLo": {type: 'f'},
                 "xDomainLo1000": {type: 'f'},
                 "xDomainLoMillis": {type: 'f'},
                 "xDomainLoNanos": {type: 'f'},
-                "horizPixelShift": {type: 'f'}
+                "horizPixelShift": {type: 'f'},
                 },
             attributes: {
                 "normalVector": {type: 'v3'},
@@ -1038,8 +1037,7 @@ Cache.makeShaders = function () {
                         trueNormal = normalVector; \
                     } \
                     float xDiff = 1000000000000.0 * (position.x - xDomainLo1000) + 1000000.0 * (position.z - xDomainLoMillis) + (timeNanos - xDomainLoNanos); \
-                    vec3 truePosition = vec3(xDiff, position.y - yDomainLo, 0.0); \
-                    vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(trueThickness * normalize(rot90Matrix * mat3(affineMatrix) * trueNormal), 0.0); \
+                    vec4 newPosition = affineMatrix * vec4(xDiff, position.y - yDomainLo, 0.0, 1.0) + vec4(trueThickness * normalize(cross(vec3(0, 0, 1), mat3(affineMatrix) * trueNormal)), 0.0); \
                     newPosition.x += horizPixelShift; \
                     gl_Position = projectionMatrix * modelViewMatrix * newPosition; \
                  } \
@@ -1051,6 +1049,8 @@ Cache.makeShaders = function () {
                 } \
                 "
             });
+            
+            // vec4 newPosition = affineMatrix * vec4(truePosition, 1.0) + vec4(trueThickness * normalize(rot90Matrix * mat3(affineMatrix) * trueNormal), 0.0); \ is what one of the lines used to be. I switched it to a cross product. truePosition was vec3(xDiff, position.y - yDomainLo, 0.0)
         
         var rangeshader = new THREE.ShaderMaterial({
                 uniforms: {

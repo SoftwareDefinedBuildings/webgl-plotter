@@ -162,12 +162,6 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     // create the second level of cache
     this.dataCache = new Cache(plotter.requester);
     
-    // a useful matrix
-    this.rotator90 = new THREE.Matrix3();
-    this.rotator90.set(0, -1, 0, 1, 0, 0, 0, 0, 1);
-    this.rotator60 = new THREE.Matrix3();
-    this.rotator60.set(0.5, -Math.sqrt(3) / 2, 0, Math.sqrt(3) / 2, 0.5, 0, 0, 0, 1);
-    
     // geometries currently being displayed
     this.geometries = [];
     
@@ -195,6 +189,10 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     // Store whether the "Stage 2" initialization has been completed.
     this.initializedGraph = false;
     this.initializedSummaryGraph = false;
+    
+    this.plot = new THREE.Object3D(); // where the plot goes
+    this.plot.translateZ(-this.SCREENZ);
+    this.plotter.scene.add(this.plot);
 }
 
 Plot.prototype.AXISWIDTH = 5;
@@ -809,10 +807,6 @@ Plot.prototype.drawGraph3 = function () {
         var graph, rangegraph;
         var mesh;
         var meshNum = 0;
-        if (this.plot == undefined) {
-            this.plot = new THREE.Object3D();
-            this.plotter.scene.add(this.plot);
-        }
         var cacheEntry;
         var shaders;
         
@@ -860,7 +854,7 @@ Plot.prototype.drawGraph3 = function () {
                         setMeshChild(this.plot, meshNum++, graph, shaders[1]);
                         
                         graph = cacheEntry.cached_drawing.graph;
-                        packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, undefined, this.rotator90);
+                        packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.xAxis, axis, pixelShift, undefined);
                         setMeshChild(this.plot, meshNum++, graph, shaders[0]);
                     } else {
                         meshNum += 2;
@@ -926,7 +920,7 @@ Plot.prototype.drawSummary3 = function () {
                         setMeshChild(this.wvplot, meshNum++, graph, shaders[1]);
                         
                         graph = cacheEntry.cached_drawing.graph;
-                        packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, undefined, this.rotator90)
+                        packShaderUniforms(shaders[0], affineMatrix, dispSettings.color, dispSettings.selected ? THICKNESS * 1.5 : THICKNESS, this.summaryXAxis, this.summaryYAxis, pixelShift, undefined)
                         setMeshChild(this.wvplot, meshNum++, graph, shaders[0]);
                         
                     } else {

@@ -161,6 +161,8 @@ function Plotter() {
 
     this.selectedStartTime = [1420553456000, 0];
     this.selectedEndTime = [1421676656000, 0];
+    
+    this.active = false;
 }
 
 Plotter.prototype.addToElement = function (domElem) {
@@ -178,6 +180,7 @@ Plotter.prototype.removeHTMLElem = function (elem) {
 
 /** The PLOT button. */
 Plotter.prototype.plotData = function () {
+        this.active = true;
         this.plot.plotData();
     };
     
@@ -200,9 +203,16 @@ Plotter.prototype.plotAllData = function () {
             });
     };
     
+Plotter.prototype.updatePlot = function () {
+        if (this.active) {
+            this.plot.drawGraph2();
+        }
+    };
+    
 Plotter.prototype.addAxis = function () {
         var axis = this.settings.newAxis();
         this.plotterUI.axisTable.addAxis(axis);
+        this.updatePlot();
         return axis.axisid;
     };
     
@@ -218,6 +228,7 @@ Plotter.prototype.addStream = function (stream) {
         }
         axisrow.addStream(stream);
         axisTable.updateHeight(axisid);
+        this.updatePlot();
         return setting;
     };
     
@@ -234,6 +245,7 @@ Plotter.prototype.mvStream = function (uuid, axisid) {
         fromEntry.updateUnits();
         table.updateHeight(axisid);
         table.updateHeight(fromid);
+        this.updatePlot();
     };
     
 Plotter.prototype.rmAxis = function (axisid) {
@@ -250,16 +262,19 @@ Plotter.prototype.rmAxis = function (axisid) {
                 affectedEntries[i].updateUnits();
             }
         }
+        this.updatePlot();
     };
     
 Plotter.prototype.autoscale = function (axisid) {
         this.settings.getAxis(axisid).automaticScale();
         this.plotterUI.axisTable.axisMap[axisid].setScaleUI("", "");
+        this.updatePlot();
     };
     
 Plotter.prototype.setScale = function (axisid, low, high) {
         this.settings.getAxis(axisid).setDomain(low, high);
         this.plotterUI.axisTable.axisMap[axisid].setScaleUI(low, high);
+        this.updatePlot();
     };
     
 Plotter.prototype.updateScaleUI = function (axis) {
@@ -275,6 +290,7 @@ Plotter.prototype.renameAxis = function (axisid, newName) {
 Plotter.prototype.setAxisLocation = function (axisid, right, suppressUIUpdate) {
         if (suppressUIUpdate) { // yes, skip if not suppressing UI update. The function will be called again when updating the UI so this will still happen.
             this.settings.getAxis(axisid).right = right;
+            this.updatePlot();
         } else {
             var index = right ? 2 : right === null ? 1 : 0;
             this.plotterUI.axisTable.axisMap[axisid].loc.getButton(index).click();

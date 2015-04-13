@@ -99,13 +99,13 @@ Axis.prototype.unmap = function (y) {
     };
     
 Axis.prototype.setDomain = function (domainLo, domainHi) {
-        this.domainLo = domainLo || this.domainLo;
-        this.domainHi = domainHi || this.domainHi;
+        this.domainLo = (domainLo !== undefined ? domainLo : this.domainLo);
+        this.domainHi = (domainHi !== undefined ? domainHi : this.domainHi);
     };
     
 Axis.prototype.setRange = function (rangeLo, rangeHi) {
-        this.rangeLo = rangeLo || this.rangeLo;
-        this.rangeHi = rangeHi || this.rangeHi;
+        this.rangeLo = (rangeLo !== undefined ? rangeLo : this.rangeLo);
+        this.rangeHi = (rangeHi !== undefined ? rangeHi : this.rangeHi);
         
         // Update the actual object
         this.geom.vertices[0].y = this.rangeLo;

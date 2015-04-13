@@ -35,7 +35,16 @@ function PlotterUI(plotter, x, y) {
     axisTable.addToObject(this.plotterUI);
     this.axisTable = axisTable;
     
-    this.plotterUI.position.set(x, y, 0);
+    // The Background
+    var bgGeom = new THREE.Geometry();
+    bgGeom.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1000, 0), new THREE.Vector3(plotter.VIRTUAL_WIDTH, -1000, 0), new THREE.Vector3(plotter.VIRTUAL_WIDTH, 0, 0));
+    bgGeom.faces.push(new THREE.Face3(0, 1, 2), new THREE.Face3(2, 3, 0));
+    var bgCover = new THREE.Mesh(bgGeom, new THREE.MeshBasicMaterial({color: 0xffffff}));
+    bgCover.translateZ(-0.01);
+    this.plotterUI.add(bgCover);
+    
+    
+    this.plotterUI.position.set(x, y, 0.01);
     
     plotter.scene.add(this.plotterUI);
 }

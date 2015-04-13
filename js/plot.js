@@ -248,7 +248,10 @@ Plot.prototype.setHeight = function (h) {
         
         this.plotter.plotterUI.setY(this.y);
         
+        this.wvplotspGeom.verticesNeedUpdate = true;
         this.plotbgGeom.verticesNeedUpdate = true;
+        this.plotspGeom.verticesNeedUpdate = true;
+        this.ddplotspGeom.verticesNeedUpdate = true;
     };
 
 Plot.prototype.setPlot = function (x, y, w, h) {

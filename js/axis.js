@@ -99,8 +99,14 @@ Axis.prototype.unmap = function (y) {
     };
     
 Axis.prototype.setDomain = function (domainLo, domainHi) {
-        this.domainLo = (domainLo !== undefined ? domainLo : this.domainLo);
-        this.domainHi = (domainHi !== undefined ? domainHi : this.domainHi);
+        var newDomainLo = (domainLo !== undefined ? domainLo : this.domainLo);
+        var newDomainHi = (domainHi !== undefined ? domainHi : this.domainHi);
+        if (newDomainLo >= newDomainHi) {
+            return false;
+        }
+        this.domainLo = newDomainLo;
+        this.domainHi = newDomainHi;
+        return true;
     };
     
 Axis.prototype.setRange = function (rangeLo, rangeHi) {

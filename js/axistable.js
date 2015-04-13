@@ -140,9 +140,11 @@ function AxisTableEntry(axisObj, plotter) {
     this.linput.style.position = "absolute";
     this.linput.onchange = function () {
             var intVal = Number(this.value);
+            var reset = true;
             if (isFinite(intVal) && !isNaN(intVal)) {
-                plotter.setScale(axisObj.axisid, intVal);
-            } else {
+                reset = !plotter.setScale(axisObj.axisid, intVal);
+            }
+            if (reset) {
                 this.value = axisObj.autoscale ? "" : axisObj.domainLo.toString();
             }
         };
@@ -151,9 +153,11 @@ function AxisTableEntry(axisObj, plotter) {
     this.hinput.style.position = "absolute";
     this.hinput.onchange = function () {
             var intVal = Number(this.value);
+            var reset = true;
             if (isFinite(intVal) && !isNaN(intVal)) {
-                plotter.setScale(axisObj.axisid, undefined, intVal);
-            } else {
+                reset = !plotter.setScale(axisObj.axisid, undefined, intVal);
+            }
+            if (reset) {
                 this.value = axisObj.autoscale ? "" : axisObj.domainHi.toString();
             }
         };

@@ -272,9 +272,12 @@ Plotter.prototype.autoscale = function (axisid) {
     };
     
 Plotter.prototype.setScale = function (axisid, low, high) {
-        this.settings.getAxis(axisid).setDomain(low, high);
+        if (!this.settings.getAxis(axisid).setDomain(low, high)) {
+            return false;
+        }
         this.plotterUI.axisTable.axisMap[axisid].setScaleUI(low, high);
         this.updatePlot();
+        return true;
     };
     
 Plotter.prototype.updateScaleUI = function (axis) {

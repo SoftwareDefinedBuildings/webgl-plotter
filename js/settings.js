@@ -31,8 +31,8 @@ StreamAxis.prototype.automaticScale = function () {
     };
     
 StreamAxis.prototype.setDomain = function () { // overrides Axis.prototype.setDomain
-        Axis.prototype.setDomain.apply(this, arguments);
         this.autoscale = false;
+        return Axis.prototype.setDomain.apply(this, arguments);
     };
     
 StreamAxis.prototype.addStream = function (stream) {

@@ -129,7 +129,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.wvplotspGeom.faces.push(new THREE.Face3(0, 2, 1), new THREE.Face3(1, 2, 3));
     material = new THREE.MeshBasicMaterial({color: 0xffffff});
     var wvplotsp = new THREE.Mesh(this.wvplotspGeom, material);
-    wvplotsp.translateZ(-this.SCREENZ / 2);
+    wvplotsp.translateZ(-this.SCREENZ);
     plotter.scene.add(wvplotsp);
     wvplotsp.startDrag = this.startDragWVPlot.bind(this);
     wvplotsp.stopDrag = this.stopDragWVPlot.bind(this);
@@ -142,7 +142,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.ddplotspGeom.faces.push(new THREE.Face3(0, 2, 1), new THREE.Face3(1, 2, 3));
     material = new THREE.MeshBasicMaterial({color: 0xffffff});
     var ddplotsp = new THREE.Mesh(this.ddplotspGeom, material);
-    ddplotsp.translateZ(-this.SCREENZ / 2);
+    ddplotsp.translateZ(-this.SCREENZ);
     plotter.scene.add(ddplotsp);
     
     // Detect clicks in the plot drag area. It's transparent but it's needed to detect mouse clicks.
@@ -203,11 +203,11 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.plotter.scene.add(this.plot);
     
     this.ddplot = new THREE.Object3D(); // where the ddplot goes
-    this.ddplot.translateZ(this.SCREENZ / 2);
+    this.ddplot.translateZ(this.SCREENZ);
     this.plotter.scene.add(this.ddplot);
     
     this.wvplot = new THREE.Object3D(); // where the wvplot goes
-    this.wvplot.translateZ(this.SCREENZ / 2);
+    this.wvplot.translateZ(this.SCREENZ);
     this.plotter.scene.add(this.wvplot);
 }
 

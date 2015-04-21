@@ -201,3 +201,38 @@ function getFilepath(datum) {
     }
     return (sourceName == undefined ? '<no source name>' : sourceName) + rawpath;
 }
+
+function packVector(array, index, vector) {
+    array[3 * index] = vector.x;
+    array[3 * index + 1] = vector.y;
+    array[3 * index + 2] = vector.z;
+}
+
+function makeBufferGeometry(vertices, faces, normalVectors, timeNanos, rangegraph) {
+    var i;
+    var positions = new Float32Array(vertices.length * 3);
+    var indices = new Uint32Array(faces.length * 3);
+    var normals = new Float32Array(normalVectors.length * (rangegraph ? 1 : 3));
+    var nanos = new Float32Array(timeNanos.length * 3);
+    var packNormal = rangegraph ? function (array, index, value) { array[index] = value; } : packVector;
+    for (i = 0; i < vertices.length; i++) { // vertices, normalVectors, and timeNanos should all have the same length
+        packVector(positions, i, vertices[i]);
+        packNormal(normals, i, normalVectors[i]);
+        nanos[i] = timeNanos[i];
+    }
+    for (i = 0; i < faces.length; i++) {
+        indices[3 * i] = faces[i].a;
+        indices[3 * i + 1] = faces[i].b;
+        indices[3 * i + 2] = faces[i].c;
+    }
+    var bufferGeom = new THREE.BufferGeometry();
+    bufferGeom.addAttribute('position', new THREE.BufferAttribute(positions, 3));
+    bufferGeom.addAttribute('index', new THREE.BufferAttribute(indices, 3));
+    if (rangegraph) {
+        bufferGeom.addAttribute('rangePerturb', new THREE.BufferAttribute(normals, 1));
+    } else {
+        bufferGeom.addAttribute('normalVector', new THREE.BufferAttribute(normals, 3));
+    }
+    bufferGeom.addAttribute('timeNanos', new THREE.BufferAttribute(nanos, 1));
+    return bufferGeom;
+}

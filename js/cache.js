@@ -771,9 +771,9 @@ CacheEntry.topDirMarked = new THREE.Vector3(0, 1, -1);
 CacheEntry.bottomDirMarked = new THREE.Vector3(0, -1, -1);
 CacheEntry.prototype.cacheDrawing = function (pwe) {
         var cacheEntry = this;
-        var graph = new THREE.Geometry();
-        var rangegraph = new THREE.Geometry();
-        var ddplot = new THREE.Geometry();
+        var graph = {vertices: [], faces: []};
+        var rangegraph = {vertices: [], faces: []};
+        var ddplot = {vertices: [], faces: []};
         var data = cacheEntry.cached_data;
         var vertexID = 0;
         var rangeVertexID = 0;
@@ -935,23 +935,13 @@ CacheEntry.prototype.cacheDrawing = function (pwe) {
             rangePerturb.push(-1, -1, 1, 1);
         }
         
-        graph.verticesNeedUpdate = true;
-        graph.elementsNeedUpdate = true;
-        rangegraph.verticesNeedUpdate = true;
-        rangegraph.elementsNeedUpdate = true;
-        ddplot.verticesNeedUpdate = true;
-        ddplot.elementsNeedUpdate = true;
         normals.push(Cache.zNormal);
         normals.push(Cache.zNormal);
-        
-        graph.dynamic = false;
-        rangegraph.dynamic = false;
-        ddplot.dynamic = false;
         
         cacheEntry.cached_drawing.pwe = pwe;
-        cacheEntry.cached_drawing.graph = graph;
-        cacheEntry.cached_drawing.rangegraph = rangegraph;
-        cacheEntry.cached_drawing.ddplot = ddplot;
+        cacheEntry.cached_drawing.graph = makeBufferGeometry(graph.vertices, graph.faces, normals, timeNanos, false);
+        cacheEntry.cached_drawing.rangegraph = makeBufferGeometry(rangegraph.vertices, rangegraph.faces, rangePerturb, rangeTimeNanos, true);
+        cacheEntry.cached_drawing.ddplot = makeBufferGeometry(ddplot.vertices, ddplot.faces, ddplotnormals, ddplotNanos, false);
         cacheEntry.cached_drawing.normals = normals;
         cacheEntry.cached_drawing.timeNanos = timeNanos;
         cacheEntry.cached_drawing.rangeTimeNanos = rangeTimeNanos;

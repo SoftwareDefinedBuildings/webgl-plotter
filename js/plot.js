@@ -532,7 +532,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                         var shader = shaders[0];
                                         var rangeshader = shaders[1];
                                         var ddshader = shaders[2];
-                                        shader.attributes.normalVector.value = ce.cached_drawing.normals;
+                                        /*shader.attributes.normalVector.value = ce.cached_drawing.normals;
                                         shader.attributes.timeNanos.value = ce.cached_drawing.timeNanos;
                                         rangeshader.attributes.timeNanos.value = ce.cached_drawing.rangeTimeNanos;
                                         rangeshader.attributes.rangePerturb.value = ce.cached_drawing.rangePerturb;
@@ -543,7 +543,7 @@ Plot.prototype.fullUpdate = function (callback, summary) {
                                         rangeshader.attributes.timeNanos.needsUpdate = true;
                                         rangeshader.attributes.rangePerturb.needsUpdate = true;
                                         ddshader.attributes.normalVector.needsUpdate = true;
-                                        ddshader.attributes.timeNanos.needsUpdate = true;
+                                        ddshader.attributes.timeNanos.needsUpdate = true;*/
                                     }
                                 }
                                 fp = null;

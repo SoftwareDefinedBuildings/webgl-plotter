@@ -30,8 +30,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     this.w = plotter.VIRTUAL_WIDTH;
     this.h = h;
-    var SCREENZ = 0.01;
-    this.SCREENZ = SCREENZ;
+    var SCREENZ = this.SCREENZ;
     this.plotbgGeom.vertices.push(
             // four outer corner vertices (0 - 3): bl, br, tr, tl
             new THREE.Vector3(x + outermargin, y + outermargin, SCREENZ),
@@ -125,7 +124,7 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // Detect clicks in the summary plot space. It's white to block the main plot if it extends down.
     this.wvplotspGeom = new THREE.Geometry();
-    this.wvplotspGeom.vertices = this.plotbgGeom.vertices.slice(8, 12);
+    this.wvplotspGeom.vertices = this.plotbgGeom.vertices.slice(12, 16);
     this.wvplotspGeom.faces.push(new THREE.Face3(0, 2, 1), new THREE.Face3(1, 2, 3));
     material = new THREE.MeshBasicMaterial({color: 0xffffff});
     var wvplotsp = new THREE.Mesh(this.wvplotspGeom, material);
@@ -138,12 +137,18 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     
     // Cover the data density plot space. It's white to block the main plot if it extends up.
     this.ddplotspGeom = new THREE.Geometry();
-    this.ddplotspGeom.vertices = this.plotbgGeom.vertices.slice(12, 16);
+    this.ddplotspGeom.vertices = this.plotbgGeom.vertices.slice(8, 12);
     this.ddplotspGeom.faces.push(new THREE.Face3(0, 2, 1), new THREE.Face3(1, 2, 3));
     material = new THREE.MeshBasicMaterial({color: 0xffffff});
     var ddplotsp = new THREE.Mesh(this.ddplotspGeom, material);
     ddplotsp.translateZ(-this.SCREENZ);
     plotter.scene.add(ddplotsp);
+    ddplotsp.startDrag = this.startDragPlot.bind(this);
+    ddplotsp.stopDrag = this.stopDragPlot.bind(this);
+    ddplotsp.drag = this.dragPlot.bind(this);
+    ddplotsp.scroll = this.scrollPlot.bind(this);
+    plotter.draggables.push(ddplotsp);
+    plotter.scrollables.push(ddplotsp);
     
     // Detect clicks in the plot drag area. It's transparent but it's needed to detect mouse clicks.
     this.plotdrGeom = new THREE.Geometry();
@@ -199,20 +204,19 @@ function Plot (plotter, outermargin, hToW, x, y) { // implements Draggable, Scro
     this.initializedSummaryGraph = false;
     
     this.plot = new THREE.Object3D(); // where the plot goes
-    this.plot.translateZ(-this.SCREENZ);
+    this.plot.translateZ(-2 * this.SCREENZ);
     this.plotter.scene.add(this.plot);
     
     this.ddplot = new THREE.Object3D(); // where the ddplot goes
-    this.ddplot.translateZ(this.SCREENZ);
     this.plotter.scene.add(this.ddplot);
     
     this.wvplot = new THREE.Object3D(); // where the wvplot goes
-    this.wvplot.translateZ(this.SCREENZ);
     this.plotter.scene.add(this.wvplot);
 }
 
 Plot.prototype.AXISWIDTH = 5;
 Plot.prototype.INSERT_DELAY = 5000; // It takes QUASAR five seconds to finalize an insert
+Plot.prototype.SCREENZ = 0.01;
 
 Plot.prototype.getVirtualToRealPixelRatio = function () {
         this.recomputePixelsWideIfNecessary();

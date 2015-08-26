@@ -82,7 +82,7 @@ function Plotter() {
     $(this.canvas).mousemove(function (event) {
             if (self.dragging !== null) {
                 var dx, dy;
-                if (event.originalEvent.hasOwnProperty("movementX")) {
+                if (event.originalEvent.movementX != undefined) {
                     dx = event.originalEvent.movementX;
                     dy = event.originalEvent.movementY;
                 } else {
